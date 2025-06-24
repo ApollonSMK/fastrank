@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -13,6 +12,7 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -328,8 +328,8 @@ export default function TeamDetailsPage() {
             <DialogHeader>
               <DialogTitle>Transferir {selectedDriver?.name}</DialogTitle>
             </DialogHeader>
-            <div className="py-4">
-              <FormLabel>Transferir para a equipa:</FormLabel>
+            <div className="py-4 space-y-2">
+              <Label>Transferir para a equipa:</Label>
                <Select onValueChange={setTargetTeamId} value={targetTeamId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione uma equipa" />
