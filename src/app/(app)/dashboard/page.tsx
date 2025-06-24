@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState } from 'react';
-import { drivers as initialDrivers, teams, Driver, DailyDelivery } from '@/lib/mock-data';
+import { drivers as initialDrivers, teams, Driver, DailyDelivery, achievements } from '@/lib/mock-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trophy, Award, Medal, TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, PlusCircle, Trash2 } from 'lucide-react';
+import { Trophy, Award, Medal, TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, PlusCircle, Trash2, Rocket, CalendarDays } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -22,6 +22,8 @@ import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip as UiTooltip, TooltipContent as UiTooltipContent, TooltipProvider, TooltipTrigger as UiTooltipTrigger } from "@/components/ui/tooltip";
+
 
 const chartConfig = {
   deliveries: {
@@ -36,9 +38,16 @@ const deliveryFormSchema = z.object({
 });
 type DeliveryFormValues = z.infer<typeof deliveryFormSchema>;
 
+const iconMap: { [key: string]: React.ElementType } = {
+  Rocket,
+  Award,
+  ShieldCheck,
+  Trophy,
+  CalendarDays,
+};
 
 const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }) => {
-  const { name, trips, safetyScore, efficiency, dailyDeliveries } = driver;
+  const { name, trips, safetyScore, efficiency, dailyDeliveries, achievementIds } = driver;
 
   const [date, setDate] = React.useState<DateRange | undefined>();
 
@@ -160,6 +169,42 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+            <CardTitle>Conquistas</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <TooltipProvider>
+                {achievementIds.length > 0 ? (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 text-center">
+                    {achievementIds.map(id => {
+                    const achievement = achievements[id];
+                    if (!achievement) return null;
+                    const Icon = iconMap[achievement.icon];
+                    return (
+                        <UiTooltip key={id}>
+                            <UiTooltipTrigger asChild>
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-accent/50 border-2 border-accent text-accent-foreground">
+                                        <Icon className="h-8 w-8 text-primary" />
+                                    </div>
+                                    <span className="text-xs font-medium">{achievement.name}</span>
+                                </div>
+                            </UiTooltipTrigger>
+                            <UiTooltipContent>
+                                <p>{achievement.description}</p>
+                            </UiTooltipContent>
+                        </UiTooltip>
+                    );
+                    })}
+                </div>
+                ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma conquista ainda.</p>
+                )}
+            </TooltipProvider>
         </CardContent>
       </Card>
     </div>

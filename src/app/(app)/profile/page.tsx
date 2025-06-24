@@ -3,8 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getLoggedInDriver, Driver } from "@/lib/mock-data";
-import { TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon } from "lucide-react";
+import { getLoggedInDriver, Driver, achievements } from "@/lib/mock-data";
+import { TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, Rocket, Award, Trophy, CalendarDays } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -14,12 +14,22 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Tooltip as UiTooltip, TooltipContent as UiTooltipContent, TooltipProvider, TooltipTrigger as UiTooltipTrigger } from "@/components/ui/tooltip";
+
 
 const chartConfig = {
   deliveries: {
     label: "Entregas",
     color: "hsl(var(--primary))",
   },
+};
+
+const iconMap: { [key: string]: React.ElementType } = {
+  Rocket,
+  Award,
+  ShieldCheck,
+  Trophy,
+  CalendarDays,
 };
 
 function ProfileSkeleton() {
@@ -67,7 +77,7 @@ export default function ProfilePage() {
     return <ProfileSkeleton />;
   }
 
-  const { name, rank, trips, safetyScore, efficiency, dailyDeliveries } = driver;
+  const { name, rank, trips, safetyScore, efficiency, dailyDeliveries, achievementIds } = driver;
   const totalDeliveries = dailyDeliveries.reduce((sum, day) => sum + day.deliveries, 0);
 
   const stats = [
@@ -180,6 +190,42 @@ export default function ProfilePage() {
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+            <CardTitle>Conquistas</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <TooltipProvider>
+                {achievementIds.length > 0 ? (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 text-center">
+                    {achievementIds.map(id => {
+                    const achievement = achievements[id];
+                    if (!achievement) return null;
+                    const Icon = iconMap[achievement.icon];
+                    return (
+                        <UiTooltip key={id}>
+                            <UiTooltipTrigger asChild>
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-accent/50 border-2 border-accent text-accent-foreground">
+                                        <Icon className="h-8 w-8 text-primary" />
+                                    </div>
+                                    <span className="text-xs font-medium">{achievement.name}</span>
+                                </div>
+                            </UiTooltipTrigger>
+                            <UiTooltipContent>
+                                <p>{achievement.description}</p>
+                            </UiTooltipContent>
+                        </UiTooltip>
+                    );
+                    })}
+                </div>
+                ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma conquista ainda.</p>
+                )}
+            </TooltipProvider>
         </CardContent>
       </Card>
     </div>
