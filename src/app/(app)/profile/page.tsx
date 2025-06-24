@@ -1,9 +1,12 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { loggedInDriver } from "@/lib/mock-data";
+import { getLoggedInDriver } from "@/lib/mock-data";
 import { TrendingUp, Route, ShieldCheck, Fuel } from "lucide-react";
 
 export default function ProfilePage() {
+  const loggedInDriver = getLoggedInDriver();
+
   if (!loggedInDriver) {
     return (
       <div className="flex h-full items-center justify-center">

@@ -1,3 +1,4 @@
+
 export type Driver = {
   id: number;
   name: string;
@@ -43,7 +44,7 @@ export const teams: Team[] = [
   { id: 4, name: "Sushi Villa" },
 ];
 
-export const loggedInDriver = drivers.find(d => d.driverLoginId === "daniela.lima")!;
+export const getLoggedInDriver = () => drivers.find(d => d.driverLoginId === "daniela.lima");
 
 export const rankingHistory: RankHistory[] = [
   { month: "Jan", rank: 8 },
