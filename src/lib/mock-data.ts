@@ -9,6 +9,12 @@ export type Driver = {
   efficiency: number;
 };
 
+export type Team = {
+  id: number;
+  name: string;
+  members: number;
+};
+
 export type RankHistory = {
   month: string;
   rank: number;
@@ -25,6 +31,13 @@ export const drivers: Driver[] = [
   { id: 8, name: "Helena Santos", avatar: "/avatars/08.png", rank: 8, points: 4710, trips: 47, safetyScore: 92, efficiency: 89 },
   { id: 9, name: "Igor Almeida", avatar: "/avatars/09.png", rank: 9, points: 4680, trips: 46, safetyScore: 91, efficiency: 88 },
   { id: 10, name: "Juliana Pereira", avatar: "/avatars/10.png", rank: 10, points: 4650, trips: 45, safetyScore: 90, efficiency: 87 },
+];
+
+export const teams: Team[] = [
+  { id: 1, name: "Team Heliomar", members: 5 },
+  { id: 2, name: "Team Rui", members: 4 },
+  { id: 3, name: "Team Ivan Sushi Kirchberg", members: 6 },
+  { id: 4, name: "Sushi Villa", members: 3 },
 ];
 
 export const loggedInDriver = drivers[3]; // Simulate Daniela Lima is logged in

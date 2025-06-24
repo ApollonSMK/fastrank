@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { drivers } from "@/lib/mock-data";
+import { teams } from "@/lib/mock-data";
 import { PlusCircle, MoreVertical } from "lucide-react";
 import {
   DropdownMenu,
@@ -19,15 +19,15 @@ import { Card, CardContent } from "@/components/ui/card";
 
 
 export default function AdminPage() {
-  const sortedDrivers = [...drivers].sort((a, b) => a.id - b.id);
+  const sortedTeams = [...teams].sort((a, b) => a.id - b.id);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-headline text-2xl font-bold">Gestão de Motoristas</h2>
+        <h2 className="font-headline text-2xl font-bold">Gestão de Equipas</h2>
         <Button>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Adicionar
+          Adicionar Equipa
         </Button>
       </div>
 
@@ -38,16 +38,16 @@ export default function AdminPage() {
               <TableRow>
                 <TableHead>ID</TableHead>
                 <TableHead>Nome</TableHead>
-                <TableHead>Pontos</TableHead>
+                <TableHead>Membros</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedDrivers.map((driver) => (
-                <TableRow key={driver.id}>
-                  <TableCell className="font-medium">{driver.id}</TableCell>
-                  <TableCell>{driver.name}</TableCell>
-                  <TableCell>{driver.points}</TableCell>
+              {sortedTeams.map((team) => (
+                <TableRow key={team.id}>
+                  <TableCell className="font-medium">{team.id}</TableCell>
+                  <TableCell>{team.name}</TableCell>
+                  <TableCell>{team.members}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
