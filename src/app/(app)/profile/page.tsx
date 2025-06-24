@@ -6,6 +6,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getLoggedInDriver, Driver } from "@/lib/mock-data";
 import { TrendingUp, Route, ShieldCheck, Fuel } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+
+const chartConfig = {
+  score: {
+    label: "Score",
+    color: "hsl(var(--primary))",
+  },
+};
 
 function ProfileSkeleton() {
   return (
@@ -30,6 +39,7 @@ function ProfileSkeleton() {
           </Card>
         ))}
       </div>
+       <Skeleton className="h-[200px] w-full" />
     </div>
   );
 }
@@ -46,13 +56,18 @@ export default function ProfilePage() {
     return <ProfileSkeleton />;
   }
 
-  const { name, avatar, rank, points, trips, safetyScore, efficiency } = driver;
+  const { name, rank, points, trips, safetyScore, efficiency } = driver;
 
   const stats = [
     { label: "Total de Pontos", value: points.toLocaleString(), icon: TrendingUp },
     { label: "Viagens Concluídas", value: trips, icon: Route },
     { label: "Pontuação de Segurança", value: `${safetyScore}%`, icon: ShieldCheck },
     { label: "Eficiência", value: `${efficiency}%`, icon: Fuel },
+  ];
+
+  const chartData = [
+    { name: "Segurança", score: safetyScore },
+    { name: "Eficiência", score: efficiency },
   ];
 
   return (
@@ -81,6 +96,38 @@ export default function ProfilePage() {
           </Card>
         ))}
       </div>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Métricas de Desempenho</CardTitle>
+        </CardHeader>
+        <CardContent className="pl-2">
+          <ChartContainer config={chartConfig} className="h-[120px] w-full">
+            <ResponsiveContainer>
+              <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 10 }}>
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  width={80}
+                  className="text-xs"
+                />
+                <XAxis type="number" domain={[0, 100]} hide />
+                <Tooltip
+                  cursor={{ fill: 'hsl(var(--muted))' }}
+                  content={<ChartTooltipContent 
+                    formatter={(value) => `${value}%`}
+                    indicator="line" 
+                  />}
+                />
+                <Bar dataKey="score" radius={4} fill="var(--color-score)" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+        </CardContent>
+      </Card>
     </div>
   );
 }
