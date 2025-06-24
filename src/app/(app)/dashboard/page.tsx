@@ -1,11 +1,11 @@
 "use client";
 
-import React from 'react';
-import { drivers, Driver } from '@/lib/mock-data';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState } from 'react';
+import { drivers as initialDrivers, Driver, DailyDelivery } from '@/lib/mock-data';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trophy, Award, Medal, TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon } from 'lucide-react';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { Trophy, Award, Medal, TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, PlusCircle, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { DateRange } from "react-day-picker";
@@ -14,6 +14,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useForm, SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 const chartConfig = {
   deliveries: {
@@ -21,6 +27,13 @@ const chartConfig = {
     color: "hsl(var(--primary))",
   },
 };
+
+const deliveryFormSchema = z.object({
+  date: z.date({ required_error: "A data é obrigatória." }),
+  deliveries: z.coerce.number().min(0, "O número de entregas não pode ser negativo."),
+});
+type DeliveryFormValues = z.infer<typeof deliveryFormSchema>;
+
 
 const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }) => {
   const { name, trips, safetyScore, efficiency, dailyDeliveries } = driver;
@@ -149,12 +162,85 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
 
 
 export default function DashboardPage() {
-  const sortedDrivers = [...drivers]
+  const [drivers, setDrivers] = useState<Driver[]>(initialDrivers);
+
+  const sortedDrivers = React.useMemo(() => [...drivers]
     .map(driver => ({
       ...driver,
       totalDeliveries: driver.dailyDeliveries.reduce((sum, day) => sum + day.deliveries, 0),
     }))
-    .sort((a, b) => b.totalDeliveries - a.totalDeliveries);
+    .sort((a, b) => b.totalDeliveries - a.totalDeliveries), [drivers]);
+
+  const [isDeliveriesDialogOpen, setIsDeliveriesDialogOpen] = useState(false);
+  const [selectedDriverForDeliveries, setSelectedDriverForDeliveries] = useState<Driver | null>(null);
+
+  const deliveryForm = useForm<DeliveryFormValues>({
+    resolver: zodResolver(deliveryFormSchema),
+    defaultValues: {
+      deliveries: 0,
+    },
+  });
+
+  const driverForDeliveries = drivers.find(d => d.id === selectedDriverForDeliveries?.id);
+
+  const handleAddDelivery: SubmitHandler<DeliveryFormValues> = (data) => {
+    if (!driverForDeliveries) return;
+
+    const newDelivery: DailyDelivery = {
+      date: format(data.date, 'yyyy-MM-dd'),
+      deliveries: data.deliveries,
+    };
+
+    const updateDriverDeliveries = (driver: Driver) => {
+        const existingDates = new Set(driver.dailyDeliveries.map(d => d.date));
+        if (existingDates.has(newDelivery.date)) {
+            console.error("A delivery record for this date already exists.");
+            return driver.dailyDeliveries;
+        }
+        const updatedDeliveries = [...driver.dailyDeliveries, newDelivery];
+        return updatedDeliveries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }
+
+    const newDriversState = drivers.map(d => 
+      d.id === driverForDeliveries.id 
+        ? { ...d, dailyDeliveries: updateDriverDeliveries(d) }
+        : d
+    );
+    setDrivers(newDriversState);
+    
+    const driverInMock = initialDrivers.find(d => d.id === driverForDeliveries.id);
+    if (driverInMock) {
+      driverInMock.dailyDeliveries = updateDriverDeliveries(driverInMock);
+    }
+    
+    deliveryForm.reset();
+  };
+  
+  const handleRemoveDelivery = (dateToRemove: string) => {
+    if (!driverForDeliveries) return;
+
+    const updateDriverDeliveries = (driver: Driver) => {
+        return driver.dailyDeliveries.filter(d => d.date !== dateToRemove);
+    };
+
+    const newDriversState = drivers.map(d => 
+      d.id === driverForDeliveries.id
+        ? { ...d, dailyDeliveries: updateDriverDeliveries(d) }
+        : d
+    );
+    setDrivers(newDriversState);
+
+    const driverInMock = initialDrivers.find(d => d.id === driverForDeliveries.id);
+    if (driverInMock) {
+        driverInMock.dailyDeliveries = updateDriverDeliveries(driverInMock);
+    }
+  };
+
+  const openDeliveriesDialog = (e: React.MouseEvent, driver: Driver) => {
+    e.stopPropagation();
+    setSelectedDriverForDeliveries(driver);
+    setIsDeliveriesDialogOpen(true);
+  };
 
   const getRankIndicator = (rank: number) => {
     if (rank === 1) return <Trophy className="h-5 w-5 text-yellow-500" />;
@@ -164,37 +250,161 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <h2 className="font-headline text-2xl font-bold">Ranking de Motoristas</h2>
-      <div className="space-y-3">
-        {sortedDrivers.map((driver, index) => {
-          const rank = index + 1;
-          return (
-            <Dialog key={driver.id}>
-              <DialogTrigger asChild>
-                <Card className="transition-transform duration-200 hover:scale-[1.02] hover:shadow-md cursor-pointer">
-                  <CardContent className="flex items-center gap-4 p-4">
-                    <div className="flex h-8 w-8 items-center justify-center font-bold">
-                      {getRankIndicator(rank)}
-                    </div>
-                    <Avatar>
-                      <AvatarImage src={`https://placehold.co/40x40.png`} data-ai-hint="person portrait" alt={driver.name} />
-                      <AvatarFallback>{driver.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="font-semibold">{driver.name}</p>
-                      <p className="text-sm text-muted-foreground">{driver.totalDeliveries.toLocaleString()} entregas</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </DialogTrigger>
-              <DialogContent className="max-w-md p-4 sm:p-6">
-                <DriverProfileContent driver={driver} rank={rank} />
-              </DialogContent>
-            </Dialog>
-          )
-        })}
+    <>
+      <div className="space-y-4">
+        <h2 className="font-headline text-2xl font-bold">Ranking de Motoristas</h2>
+        <div className="space-y-3">
+          {sortedDrivers.map((driver, index) => {
+            const rank = index + 1;
+            return (
+              <Dialog key={driver.id}>
+                <DialogTrigger asChild>
+                  <Card className="transition-transform duration-200 hover:scale-[1.02] hover:shadow-md cursor-pointer">
+                    <CardContent className="flex items-center gap-4 p-4">
+                      <div className="flex h-8 w-8 items-center justify-center font-bold">
+                        {getRankIndicator(rank)}
+                      </div>
+                      <Avatar>
+                        <AvatarImage src={`https://placehold.co/40x40.png`} data-ai-hint="person portrait" alt={driver.name} />
+                        <AvatarFallback>{driver.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="font-semibold">{driver.name}</p>
+                        <p className="text-sm text-muted-foreground">{driver.totalDeliveries.toLocaleString()} entregas</p>
+                      </div>
+                      <Button variant="ghost" size="icon" className="shrink-0" onClick={(e) => openDeliveriesDialog(e, driver as Driver)}>
+                          <PlusCircle className="h-5 w-5" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </DialogTrigger>
+                <DialogContent className="max-w-md p-4 sm:p-6">
+                  <DriverProfileContent driver={driver as Driver} rank={rank} />
+                </DialogContent>
+              </Dialog>
+            )
+          })}
+        </div>
       </div>
-    </div>
+
+      <Dialog open={isDeliveriesDialogOpen} onOpenChange={(isOpen) => {
+        setIsDeliveriesDialogOpen(isOpen);
+        if (!isOpen) {
+          setSelectedDriverForDeliveries(null);
+          deliveryForm.reset();
+        }
+      }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Gerir Entregas de {driverForDeliveries?.name}</DialogTitle>
+            <DialogDescription>Adicione ou remova registos de entregas diárias.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            <Card>
+              <CardHeader>
+                  <CardTitle className="text-lg">Adicionar Novo Registo</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Form {...deliveryForm}>
+                  <form onSubmit={deliveryForm.handleSubmit(handleAddDelivery)} className="flex items-end gap-4">
+                    <FormField
+                      control={deliveryForm.control}
+                      name="date"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Data</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant={"outline"}
+                                  className={cn(
+                                    "w-[240px] pl-3 text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                >
+                                  {field.value ? (
+                                    format(field.value, "PPP")
+                                  ) : (
+                                    <span>Escolha uma data</span>
+                                  )}
+                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) =>
+                                  date > new Date() || date < new Date("2000-01-01") || (driverForDeliveries?.dailyDeliveries.some(d => d.date === format(date, 'yyyy-MM-dd')) ?? false)
+                                }
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={deliveryForm.control}
+                      name="deliveries"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nº de Entregas</FormLabel>
+                          <FormControl>
+                            <Input type="number" className="w-32" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit">Adicionar</Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+             <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg">Histórico de Entregas</CardTitle>
+                </CardHeader>
+                <CardContent className="max-h-64 overflow-y-auto">
+                    {driverForDeliveries && driverForDeliveries.dailyDeliveries.length > 0 ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Data</TableHead>
+                                    <TableHead>Entregas</TableHead>
+                                    <TableHead className="text-right">Ação</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {driverForDeliveries.dailyDeliveries.map(delivery => (
+                                    <TableRow key={delivery.date}>
+                                        <TableCell>{format(new Date(delivery.date), "dd/MM/yyyy")}</TableCell>
+                                        <TableCell>{delivery.deliveries}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="ghost" size="icon" onClick={() => handleRemoveDelivery(delivery.date)}>
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : (
+                        <p className="text-center text-sm text-muted-foreground py-4">Sem registos de entregas.</p>
+                    )}
+                </CardContent>
+            </Card>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeliveriesDialogOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
