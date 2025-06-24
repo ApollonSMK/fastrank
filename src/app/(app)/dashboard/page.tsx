@@ -1,12 +1,19 @@
 "use client";
 
+import React from 'react';
 import { drivers, Driver } from '@/lib/mock-data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trophy, Award, Medal, TrendingUp, Route, ShieldCheck, Fuel } from 'lucide-react';
+import { Trophy, Award, Medal, TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { DateRange } from "react-day-picker";
+import { addDays, format } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const chartConfig = {
   deliveries: {
@@ -18,6 +25,11 @@ const chartConfig = {
 const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }) => {
   const { name, trips, safetyScore, efficiency, dailyDeliveries } = driver;
 
+  const [date, setDate] = React.useState<DateRange | undefined>({
+    from: addDays(new Date(), -6),
+    to: new Date(),
+  });
+
   const totalDeliveries = dailyDeliveries.reduce((sum, day) => sum + day.deliveries, 0);
 
   const stats = [
@@ -27,10 +39,21 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
     { label: "Eficiência", value: `${efficiency}%`, icon: Fuel },
   ];
 
-  const chartData = dailyDeliveries.map(d => ({
-    date: new Date(d.date).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' }),
-    deliveries: d.deliveries,
-  }));
+  const chartData = dailyDeliveries
+    .map(d => {
+        const [year, month, day] = d.date.split('-').map(Number);
+        return { ...d, dateObj: new Date(year, month - 1, day) };
+    })
+    .filter(d => {
+        if (!date?.from) return true;
+        const from = date.from;
+        const to = date.to ?? from;
+        return d.dateObj >= from && d.dateObj <= to;
+    })
+    .map(d => ({
+      date: d.dateObj.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' }),
+      deliveries: d.deliveries,
+    }));
 
   return (
     <div className="space-y-6">
@@ -61,7 +84,44 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Entregas Diárias</CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <CardTitle className="text-base">Entregas Diárias</CardTitle>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  id="date"
+                  variant={"outline"}
+                  className={cn(
+                    "w-full sm:w-[260px] justify-start text-left font-normal",
+                    !date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date?.from ? (
+                    date.to ? (
+                      <>
+                        {format(date.from, "dd/MM/y")} - {format(date.to, "dd/MM/y")}
+                      </>
+                    ) : (
+                      format(date.from, "dd/MM/y")
+                    )
+                  ) : (
+                    <span>Escolha um período</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={date?.from}
+                  selected={date}
+                  onSelect={setDate}
+                  numberOfMonths={1}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
         </CardHeader>
         <CardContent className="pl-2">
           <ChartContainer config={chartConfig} className="h-[200px] w-full">
