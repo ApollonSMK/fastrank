@@ -17,8 +17,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['"PT Sans"', 'sans-serif'],
-        headline: ['"PT Sans"', 'sans-serif'],
+        body: ['"Exo 2"', 'sans-serif'],
+        headline: ['"Orbitron"', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {

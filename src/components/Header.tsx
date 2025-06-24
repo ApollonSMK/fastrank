@@ -14,10 +14,10 @@ import { notifications } from "@/lib/mock-data"
 
 export default function Header() {
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-card px-4 shadow-sm">
+    <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-primary/20 bg-card/80 px-4 shadow-lg shadow-primary/10 backdrop-blur-sm">
       <div className="flex items-center gap-2">
         <Car className="h-6 w-6 text-primary" />
-        <h1 className="font-headline text-xl font-bold text-primary">
+        <h1 className="font-headline text-xl font-black tracking-wider text-primary text-glow">
           Fastrack Ranking
         </h1>
       </div>

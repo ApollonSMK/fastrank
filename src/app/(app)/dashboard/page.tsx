@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { drivers as initialDrivers, teams, Driver, DailyDelivery, achievements } from '@/lib/mock-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -91,7 +91,7 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
           <AvatarFallback className="text-3xl">{name.charAt(0)}</AvatarFallback>
         </Avatar>
         <div className="text-center">
-          <h2 className="font-headline text-2xl font-bold">{name}</h2>
+          <h2 className="font-headline text-2xl font-bold text-glow">{name}</h2>
           <p className="text-lg text-muted-foreground">Posição no Ranking: <span className="font-bold text-primary">#{rank}</span></p>
         </div>
       </div>
@@ -188,8 +188,8 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
                         <UiTooltip key={id}>
                             <UiTooltipTrigger asChild>
                                 <div className="flex flex-col items-center gap-2">
-                                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-accent/50 border-2 border-accent text-accent-foreground">
-                                        <Icon className="h-8 w-8 text-primary" />
+                                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-accent/10 border-2 border-accent text-accent-foreground">
+                                        <Icon className="h-8 w-8 text-accent drop-shadow-[0_0_5px_hsl(var(--accent))]" />
                                     </div>
                                     <span className="text-xs font-medium">{achievement.name}</span>
                                 </div>
@@ -319,16 +319,16 @@ export default function DashboardPage() {
   };
 
   const getRankIndicator = (rank: number) => {
-    if (rank === 1) return <Trophy className="h-5 w-5 text-yellow-500" />;
-    if (rank === 2) return <Award className="h-5 w-5 text-slate-400" />;
-    if (rank === 3) return <Medal className="h-5 w-5 text-orange-400" />;
+    if (rank === 1) return <Trophy className="h-5 w-5 text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.7)]" />;
+    if (rank === 2) return <Award className="h-5 w-5 text-slate-300 drop-shadow-[0_0_5px_rgba(203,213,225,0.7)]" />;
+    if (rank === 3) return <Medal className="h-5 w-5 text-orange-400 drop-shadow-[0_0_5px_rgba(251,146,60,0.7)]" />;
     return <span className="text-sm font-bold text-muted-foreground">{rank}</span>;
   };
 
   return (
     <>
       <div className="space-y-4">
-        <h2 className="font-headline text-2xl font-bold">Ranking de Motoristas</h2>
+        <h2 className="font-headline text-2xl font-bold text-glow">Ranking de Motoristas</h2>
         
         <Card className="mb-4">
             <CardHeader>
@@ -399,7 +399,7 @@ export default function DashboardPage() {
             return (
               <Dialog key={driver.id}>
                 <DialogTrigger asChild>
-                  <Card className="transition-transform duration-200 hover:scale-[1.02] hover:shadow-md cursor-pointer">
+                  <Card className="transition-all duration-200 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/20 cursor-pointer">
                     <CardContent className="flex items-center gap-4 p-4">
                       <div className="flex h-8 w-8 items-center justify-center font-bold">
                         {getRankIndicator(rank)}

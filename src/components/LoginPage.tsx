@@ -43,13 +43,13 @@ export default function LoginPage() {
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
             <main className="w-full max-w-md">
-                <Card className="w-full">
+                <Card className="w-full border-primary/20 shadow-lg shadow-primary/10">
                     <form onSubmit={handleLogin}>
                         <CardHeader className="text-center">
-                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/40">
                                 <Car className="h-8 w-8" />
                             </div>
-                            <CardTitle className="font-headline text-3xl">Fastrack Ranking</CardTitle>
+                            <CardTitle className="font-headline text-3xl font-black text-primary text-glow">Fastrack Ranking</CardTitle>
                             <CardDescription>Bem-vindo! Faça login para continuar.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -79,7 +79,7 @@ export default function LoginPage() {
                             </div>
                         </CardContent>
                         <CardFooter>
-                            <Button type="submit" className="w-full" disabled={isLoading}>
+                            <Button type="submit" className="w-full font-bold" disabled={isLoading}>
                                 {isLoading ? "A entrar..." : "Entrar"}
                             </Button>
                         </CardFooter>
