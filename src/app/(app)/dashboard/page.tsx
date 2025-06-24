@@ -418,7 +418,7 @@ export default function DashboardPage() {
                     </CardContent>
                   </Card>
                 </DialogTrigger>
-                <DialogContent className="max-w-md p-4 sm:p-6">
+                <DialogContent className="max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
                   <DriverProfileContent driver={driver as Driver} rank={rank} />
                 </DialogContent>
               </Dialog>
