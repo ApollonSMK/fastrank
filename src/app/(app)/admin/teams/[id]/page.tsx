@@ -6,7 +6,6 @@ import { teams, drivers as initialDrivers, Driver } from '@/lib/mock-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PlusCircle, ArrowLeft } from 'lucide-react';
 import { useForm, SubmitHandler } from 'react-hook-form';
@@ -18,6 +17,8 @@ const FormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
   licensePlate: z.string().regex(/^[A-Z]{2}-\d{2}-[A-Z]{2}$/, { message: 'Formato de matrícula inválido (ex: AA-11-BB).' }),
   vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
+  driverLoginId: z.string().min(3, { message: 'O ID de login deve ter pelo menos 3 caracteres.' }),
+  password: z.string().min(6, { message: 'A senha deve ter pelo menos 6 caracteres.' }),
 });
 
 type FormValues = z.infer<typeof FormSchema>;
@@ -37,6 +38,8 @@ export default function TeamDetailsPage() {
       name: "",
       licensePlate: "",
       vehicleModel: "",
+      driverLoginId: "",
+      password: "",
     },
   });
 
@@ -48,7 +51,6 @@ export default function TeamDetailsPage() {
 
   const onSubmit: SubmitHandler<FormValues> = (data) => {
     const newDriverId = drivers.length > 0 ? Math.max(...drivers.map(d => d.id)) + 1 : 1;
-    const newDriverLoginId = `${data.name.split(' ')[0].toLowerCase()}${newDriverId}`;
     
     const newDriver: Driver = {
       id: newDriverId,
@@ -56,7 +58,8 @@ export default function TeamDetailsPage() {
       licensePlate: data.licensePlate.toUpperCase(),
       vehicleModel: data.vehicleModel,
       teamId: team.id,
-      driverLoginId: newDriverLoginId,
+      driverLoginId: data.driverLoginId,
+      password: data.password,
       avatar: '/avatars/default.png',
       rank: drivers.length + 1,
       points: 0,
@@ -66,6 +69,9 @@ export default function TeamDetailsPage() {
     };
 
     setDrivers(prevDrivers => [...prevDrivers, newDriver]);
+    // In a real app, you would also persist this change to your backend.
+    // For this demo, we are just updating the local state.
+    initialDrivers.push(newDriver);
     form.reset();
   };
 
@@ -122,6 +128,32 @@ export default function TeamDetailsPage() {
                     <FormLabel>Modelo do Veículo</FormLabel>
                     <FormControl>
                       <Input placeholder="Ex: Renault Clio" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="driverLoginId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ID de Login</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: joao.silva" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Senha</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
