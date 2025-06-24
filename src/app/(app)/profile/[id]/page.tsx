@@ -55,10 +55,7 @@ export default function DriverProfilePage() {
   const router = useRouter();
   const params = useParams();
   const [driver, setDriver] = useState<Driver | null | undefined>(undefined);
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: addDays(new Date(), -6),
-    to: new Date(),
-  });
+  const [date, setDate] = useState<DateRange | undefined>();
 
   useEffect(() => {
     if (params.id) {
@@ -67,6 +64,13 @@ export default function DriverProfilePage() {
         setDriver(foundDriver || null);
     }
   }, [params.id]);
+
+  useEffect(() => {
+    setDate({
+      from: addDays(new Date(), -6),
+      to: new Date(),
+    });
+  }, []);
 
   if (driver === undefined) {
     return <ProfileSkeleton />;

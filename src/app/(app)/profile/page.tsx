@@ -52,14 +52,15 @@ function ProfileSkeleton() {
 
 export default function ProfilePage() {
   const [driver, setDriver] = useState<Driver | undefined>(undefined);
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: addDays(new Date(), -6),
-    to: new Date(),
-  });
+  const [date, setDate] = useState<DateRange | undefined>();
 
   useEffect(() => {
     // We get the logged in driver from the client-side to avoid hydration errors
     setDriver(getLoggedInDriver());
+    setDate({
+      from: addDays(new Date(), -6),
+      to: new Date(),
+    });
   }, []);
 
   if (!driver) {

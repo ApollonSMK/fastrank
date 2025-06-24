@@ -40,10 +40,14 @@ type DeliveryFormValues = z.infer<typeof deliveryFormSchema>;
 const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }) => {
   const { name, trips, safetyScore, efficiency, dailyDeliveries } = driver;
 
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: addDays(new Date(), -6),
-    to: new Date(),
-  });
+  const [date, setDate] = React.useState<DateRange | undefined>();
+
+  React.useEffect(() => {
+    setDate({
+      from: addDays(new Date(), -6),
+      to: new Date(),
+    });
+  }, []);
 
   const totalDeliveries = dailyDeliveries.reduce((sum, day) => sum + day.deliveries, 0);
 
