@@ -4,6 +4,14 @@ import { loggedInDriver } from "@/lib/mock-data";
 import { TrendingUp, Route, ShieldCheck, Fuel } from "lucide-react";
 
 export default function ProfilePage() {
+  if (!loggedInDriver) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <p>Utilizador não encontrado.</p>
+      </div>
+    );
+  }
+
   const { name, avatar, rank, points, trips, safetyScore, efficiency } = loggedInDriver;
 
   const stats = [
