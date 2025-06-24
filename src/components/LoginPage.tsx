@@ -49,7 +49,7 @@ export default function LoginPage() {
                             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground">
                                 <Car className="h-8 w-8" />
                             </div>
-                            <CardTitle className="font-headline text-3xl">DriverRank Mobile</CardTitle>
+                            <CardTitle className="font-headline text-3xl">Fastrack Ranking</CardTitle>
                             <CardDescription>Bem-vindo! Faça login para continuar.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">

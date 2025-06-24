@@ -18,7 +18,7 @@ export default function Header() {
       <div className="flex items-center gap-2">
         <Car className="h-6 w-6 text-primary" />
         <h1 className="font-headline text-xl font-bold text-primary">
-          DriverRank
+          Fastrack Ranking
         </h1>
       </div>
       <DropdownMenu>
