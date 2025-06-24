@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { drivers as initialDrivers, Driver, DailyDelivery } from '@/lib/mock-data';
+import { drivers as initialDrivers, teams, Driver, DailyDelivery } from '@/lib/mock-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Trophy, Award, Medal, TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, PlusCircle, Trash2 } from 'lucide-react';
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, Dialog
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { DateRange } from "react-day-picker";
-import { addDays, format } from "date-fns";
+import { addDays, format, isWithinInterval, startOfDay } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,8 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const chartConfig = {
   deliveries: {
@@ -163,13 +165,38 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
 
 export default function DashboardPage() {
   const [drivers, setDrivers] = useState<Driver[]>(initialDrivers);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
+  const [date, setDate] = useState<DateRange | undefined>(undefined);
 
-  const sortedDrivers = React.useMemo(() => [...drivers]
-    .map(driver => ({
-      ...driver,
-      totalDeliveries: driver.dailyDeliveries.reduce((sum, day) => sum + day.deliveries, 0),
-    }))
-    .sort((a, b) => b.totalDeliveries - a.totalDeliveries), [drivers]);
+  const sortedDrivers = React.useMemo(() => {
+    const teamFilteredDrivers =
+      selectedTeamId === 'all'
+        ? [...drivers]
+        : drivers.filter((driver) => driver.teamId === parseInt(selectedTeamId, 10));
+
+    const driversWithDeliveries = teamFilteredDrivers.map((driver) => {
+      const totalDeliveries = driver.dailyDeliveries
+        .filter((delivery) => {
+          if (!date?.from) {
+            return true;
+          }
+          const deliveryDate = new Date(delivery.date);
+          const interval = {
+            start: startOfDay(date.from),
+            end: date.to ? startOfDay(date.to) : startOfDay(date.from),
+          };
+          return isWithinInterval(deliveryDate, interval);
+        })
+        .reduce((sum, d) => sum + d.deliveries, 0);
+
+      return {
+        ...driver,
+        totalDeliveries,
+      };
+    });
+
+    return driversWithDeliveries.sort((a, b) => b.totalDeliveries - a.totalDeliveries);
+  }, [drivers, selectedTeamId, date]);
 
   const [isDeliveriesDialogOpen, setIsDeliveriesDialogOpen] = useState(false);
   const [selectedDriverForDeliveries, setSelectedDriverForDeliveries] = useState<Driver | null>(null);
@@ -253,6 +280,70 @@ export default function DashboardPage() {
     <>
       <div className="space-y-4">
         <h2 className="font-headline text-2xl font-bold">Ranking de Motoristas</h2>
+        
+        <Card className="mb-4">
+            <CardHeader>
+                <CardTitle className="text-lg">Filtros</CardTitle>
+                <CardDescription>Filtre o ranking por equipa ou período.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 space-y-2">
+                    <Label htmlFor="team-filter">Equipa</Label>
+                    <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                        <SelectTrigger id="team-filter" className="w-full">
+                            <SelectValue placeholder="Selecionar Equipa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todas as Equipas</SelectItem>
+                            {teams.map(team => (
+                                <SelectItem key={team.id} value={String(team.id)}>
+                                    {team.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="flex-1 space-y-2">
+                    <Label htmlFor="date-filter">Período de Entregas</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                id="date-filter"
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !date && "text-muted-foreground"
+                                )}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {date?.from ? (
+                                    date.to ? (
+                                        <>
+                                            {format(date.from, "dd/MM/y")} - {format(date.to, "dd/MM/y")}
+                                        </>
+                                    ) : (
+                                        format(date.from, "dd/MM/y")
+                                    )
+                                ) : (
+                                    <span>Escolha um período</span>
+                                )}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                initialFocus
+                                mode="range"
+                                defaultMonth={date?.from}
+                                selected={date}
+                                onSelect={setDate}
+                                numberOfMonths={1}
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+            </CardContent>
+        </Card>
+
         <div className="space-y-3">
           {sortedDrivers.map((driver, index) => {
             const rank = index + 1;
