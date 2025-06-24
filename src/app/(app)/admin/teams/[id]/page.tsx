@@ -47,7 +47,7 @@ export default function TeamDetailsPage() {
   const teamMembers = drivers.filter(d => d.teamId === teamId);
 
   const onSubmit: SubmitHandler<FormValues> = (data) => {
-    const newDriverId = Math.max(...drivers.map(d => d.id)) + 1;
+    const newDriverId = drivers.length > 0 ? Math.max(...drivers.map(d => d.id)) + 1 : 1;
     const newDriverLoginId = `${data.name.split(' ')[0].toLowerCase()}${newDriverId}`;
     
     const newDriver: Driver = {
