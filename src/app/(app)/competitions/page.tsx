@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { competitions as initialCompetitions, teams, Competition } from '@/lib/mock-data';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Swords, Calendar, Users, Trophy } from 'lucide-react';
+import { Swords, Calendar, Users, Trophy, Gift } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
@@ -38,6 +38,10 @@ const CompetitionCard = ({ competition }: { competition: Competition }) => {
     
     const { status, color } = getCompetitionStatus(competition);
 
+    const rewardLabel = competition.rewardType === 'money'
+        ? `€${competition.rewardAmount.toFixed(2)}`
+        : `${competition.rewardAmount} Pontos`;
+
     return (
         <Card className="border-primary/20 shadow-lg shadow-primary/10 hover:border-primary/50 transition-all">
             <CardHeader>
@@ -53,6 +57,13 @@ const CompetitionCard = ({ competition }: { competition: Competition }) => {
                 </div>
             </CardHeader>
             <CardContent className="space-y-4">
+                <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                        <Trophy className="h-4 w-4 text-primary" />
+                        <span className="font-semibold">Prémio:</span>
+                    </div>
+                    <span className="font-bold text-amber-400">{rewardLabel}</span>
+                </div>
                 <div className="flex items-center gap-4 text-sm">
                     <div className="flex items-center gap-2 text-muted-foreground">
                         <Swords className="h-4 w-4 text-primary" />
@@ -156,5 +167,3 @@ export default function CompetitionsPage() {
         </div>
     );
 }
-
-    

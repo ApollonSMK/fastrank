@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -5,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { drivers, Driver, achievements } from "@/lib/mock-data";
-import { TrendingUp, Route, ShieldCheck, Fuel, ArrowLeft, Calendar as CalendarIcon, Rocket, Award, Trophy, CalendarDays } from "lucide-react";
+import { TrendingUp, Route, ShieldCheck, Fuel, ArrowLeft, Calendar as CalendarIcon, Rocket, Award, Trophy, CalendarDays, Wallet, Star } from "lucide-react";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
@@ -31,6 +32,7 @@ const iconMap: { [key: string]: React.ElementType } = {
   ShieldCheck,
   Trophy,
   CalendarDays,
+  Landmark: Wallet,
 };
 
 
@@ -100,7 +102,7 @@ export default function DriverProfilePage() {
     );
   }
 
-  const { name, rank, trips, safetyScore, efficiency, dailyDeliveries, achievementIds } = driver;
+  const { name, rank, trips, safetyScore, efficiency, dailyDeliveries, achievementIds, points, moneyBalance } = driver;
   const totalDeliveries = dailyDeliveries.reduce((sum, day) => sum + day.deliveries, 0);
 
   const stats = [
@@ -159,8 +161,8 @@ export default function DriverProfilePage() {
                         <UiTooltip key={id}>
                             <UiTooltipTrigger asChild>
                                 <div className="flex flex-col items-center gap-2">
-                                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-accent/50 border-2 border-accent text-accent-foreground">
-                                        <Icon className="h-6 w-6 text-primary" />
+                                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-accent/10 border-2 border-accent text-accent-foreground">
+                                        <Icon className="h-6 w-6 text-accent drop-shadow-[0_0_5px_hsl(var(--accent))]" />
                                     </div>
                                     <span className="text-xs font-medium">{achievement.name}</span>
                                 </div>
@@ -178,6 +180,27 @@ export default function DriverProfilePage() {
             </TooltipProvider>
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pontos</CardTitle>
+                <Star className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{points}</div>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Saldo</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">€{moneyBalance.toFixed(2)}</div>
+            </CardContent>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         {stats.map((stat, index) => (

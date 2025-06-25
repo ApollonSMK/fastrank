@@ -7,7 +7,7 @@ import { competitions as initialCompetitions, drivers as initialDrivers, teams }
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { ArrowLeft, Trophy, Award, Medal, ShieldCheck, Fuel, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Trophy, Award, Medal, ShieldCheck, Fuel, TrendingUp, Gift } from 'lucide-react';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -104,6 +104,10 @@ export default function CompetitionLeaderboardPage() {
     
     const { label: metricLabel, icon: MetricIcon } = metricInfo[competition.metric];
     
+    const rewardLabel = competition.rewardType === 'money'
+        ? `€${competition.rewardAmount.toFixed(2)}`
+        : `${competition.rewardAmount} Pontos`;
+
     return (
         <div className="space-y-6">
             <div>
@@ -117,6 +121,10 @@ export default function CompetitionLeaderboardPage() {
                         <CardDescription className="flex items-center gap-2 pt-2">
                             <MetricIcon className="h-5 w-5 text-primary" />
                             <span>Ranking por: {metricLabel}</span>
+                        </CardDescription>
+                         <CardDescription className="flex items-center gap-2 pt-1 text-base">
+                            <Gift className="h-5 w-5 text-amber-400" />
+                            <span>Prémio do 1º Lugar: <span className="font-bold text-amber-400">{rewardLabel}</span></span>
                         </CardDescription>
                     </CardHeader>
                 </Card>
@@ -161,5 +169,3 @@ export default function CompetitionLeaderboardPage() {
         </div>
     );
 }
-
-    

@@ -44,7 +44,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import type { DateRange } from "react-day-picker";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 
 const teamFormSchema = z.object({
@@ -60,6 +60,8 @@ const competitionFormSchema = z.object({
     from: z.date({ required_error: "A data de início é obrigatória." }),
     to: z.date({ required_error: "A data de fim é obrigatória." }),
   }),
+  rewardType: z.enum(['points', 'money'], { required_error: "O tipo de prémio é obrigatório."}),
+  rewardAmount: z.coerce.number().min(1, { message: "O valor do prémio deve ser positivo."}),
 });
 
 
@@ -197,6 +199,8 @@ const CompetitionsManagement = () => {
     defaultValues: {
       name: "",
       description: "",
+      rewardType: "points",
+      rewardAmount: 100,
     },
   });
 
@@ -219,7 +223,8 @@ const CompetitionsManagement = () => {
       participants: values.teamId === 'all' ? 'all' : [Number(values.teamId)],
       startDate: values.dateRange.from.toISOString(),
       endDate: values.dateRange.to.toISOString(),
-      // Status will be derived dynamically, so no need to set it here
+      rewardType: values.rewardType,
+      rewardAmount: values.rewardAmount,
     };
     
     initialCompetitions.push(newCompetition);
@@ -326,6 +331,43 @@ const CompetitionsManagement = () => {
                                 <FormMessage />
                             </FormItem>
                         )} />
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField control={form.control} name="rewardType" render={({ field }) => (
+                                <FormItem className="space-y-3">
+                                <FormLabel>Tipo de Prémio</FormLabel>
+                                <FormControl>
+                                    <RadioGroup
+                                    onValueChange={field.onChange}
+                                    defaultValue={field.value}
+                                    className="flex space-x-4"
+                                    >
+                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                            <RadioGroupItem value="points" />
+                                        </FormControl>
+                                        <FormLabel className="font-normal">Pontos</FormLabel>
+                                    </FormItem>
+                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                            <RadioGroupItem value="money" />
+                                        </FormControl>
+                                        <FormLabel className="font-normal">Dinheiro</FormLabel>
+                                    </FormItem>
+                                    </RadioGroup>
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )} />
+                            <FormField control={form.control} name="rewardAmount" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Valor do Prémio</FormLabel>
+                                    <FormControl><Input type="number" placeholder="Ex: 100" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
+
                         <DialogFooter>
                             <Button variant="outline" type="button" onClick={() => setIsAddCompetitionDialogOpen(false)}>Cancelar</Button>
                             <Button type="submit">Criar Competição</Button>
@@ -409,5 +451,3 @@ export default function AdminPage() {
     </>
   );
 }
-
-    

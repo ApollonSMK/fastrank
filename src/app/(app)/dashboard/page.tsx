@@ -1,10 +1,11 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
 import { drivers as initialDrivers, teams, Driver, DailyDelivery, achievements } from '@/lib/mock-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trophy, Award, Medal, TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, PlusCircle, Trash2, Rocket, CalendarDays } from 'lucide-react';
+import { Trophy, Award, Medal, TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, PlusCircle, Trash2, Rocket, CalendarDays, Wallet, Star } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -46,10 +47,11 @@ const iconMap: { [key: string]: React.ElementType } = {
   ShieldCheck,
   Trophy,
   CalendarDays,
+  Landmark: Wallet,
 };
 
 const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }) => {
-  const { name, trips, safetyScore, efficiency, dailyDeliveries, achievementIds } = driver;
+  const { name, trips, safetyScore, efficiency, dailyDeliveries, achievementIds, points, moneyBalance } = driver;
 
   const [date, setDate] = React.useState<DateRange | undefined>();
   const [isMounted, setIsMounted] = useState(false);
@@ -104,7 +106,7 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
         </div>
       </div>
       
-      <Card>
+       <Card>
         <CardHeader className='pb-4'>
             <CardTitle>Conquistas</CardTitle>
         </CardHeader>
@@ -139,6 +141,27 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
             </TooltipProvider>
         </CardContent>
       </Card>
+      
+      <div className="grid grid-cols-2 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pontos</CardTitle>
+              <Star className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{points}</div>
+            </CardContent>
+          </Card>
+           <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Saldo</CardTitle>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">€{moneyBalance.toFixed(2)}</div>
+            </CardContent>
+          </Card>
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         {stats.map((stat, index) => (
@@ -246,17 +269,20 @@ function RankingSkeleton() {
 
 
 export default function DashboardPage() {
-  const [drivers, setDrivers] = useState<Driver[]>(initialDrivers);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [sortedDrivers, setSortedDrivers] = useState<Driver[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const [date, setDate] = useState<DateRange | undefined>(undefined);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    // Client-side only
+    setDrivers(initialDrivers);
     setIsMounted(true);
   }, []);
 
-  const sortedDrivers = React.useMemo(() => {
-    if (!isMounted) return [];
+  useEffect(() => {
+    if (!isMounted) return;
 
     const teamFilteredDrivers =
       selectedTeamId === 'all'
@@ -269,8 +295,7 @@ export default function DashboardPage() {
           if (!date?.from) {
             return true;
           }
-          const [year, month, day] = delivery.date.split('-').map(Number);
-          const deliveryDate = new Date(year, month - 1, day);
+          const deliveryDate = new Date(delivery.date + 'T00:00:00');
           
           const interval = {
             start: startOfDay(date.from),
@@ -286,7 +311,7 @@ export default function DashboardPage() {
       };
     });
 
-    return driversWithDeliveries.sort((a, b) => b.totalDeliveries - a.totalDeliveries);
+    setSortedDrivers(driversWithDeliveries.sort((a, b) => b.totalDeliveries - a.totalDeliveries));
   }, [isMounted, drivers, selectedTeamId, date]);
 
   const [isDeliveriesDialogOpen, setIsDeliveriesDialogOpen] = useState(false);
