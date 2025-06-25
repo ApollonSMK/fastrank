@@ -51,6 +51,16 @@ export type RankHistory = {
   rank: number;
 };
 
+export type Competition = {
+  id: number;
+  name: string;
+  description: string;
+  metric: 'deliveries' | 'safety' | 'efficiency';
+  participants: 'all' | number[]; // 'all' or array of team IDs
+  startDate: string; // ISO string
+  endDate: string; // ISO string
+};
+
 export const achievements: Achievements = {
   'delivery-50': { name: 'Entrega Rápida', description: 'Complete 50 entregas no total.', icon: 'Rocket' },
   'delivery-150': { name: 'Mestre das Entregas', description: 'Complete 150 entregas no total.', icon: 'Award' },
@@ -83,6 +93,27 @@ export const teams: Team[] = [
   { id: 2, name: "Team Rui" },
   { id: 3, name: "Team Ivan Sushi Kirchberg" },
   { id: 4, name: "Sushi Villa" },
+];
+
+export const competitions: Competition[] = [
+    {
+        id: 1,
+        name: "Corrida de Entregas de Verão",
+        description: "Quem consegue fazer mais entregas este verão? A corrida está aberta!",
+        metric: 'deliveries',
+        participants: 'all',
+        startDate: '2024-06-01T00:00:00Z',
+        endDate: '2024-08-31T23:59:59Z',
+    },
+    {
+        id: 2,
+        name: "Campeonato da Segurança",
+        description: "Condução segura vale prémios! Mantenha a pontuação de segurança no máximo.",
+        metric: 'safety',
+        participants: [1, 2],
+        startDate: '2024-07-01T00:00:00Z',
+        endDate: '2024-07-31T23:59:59Z',
+    }
 ];
 
 export const getLoggedInDriver = () => {
