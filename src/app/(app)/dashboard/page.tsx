@@ -542,6 +542,12 @@ export default function DashboardPage() {
                     </Card>
                   </DialogTrigger>
                   <DialogContent className="max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+                    <DialogHeader className="sr-only">
+                      <DialogTitle>Perfil de {driver.name}</DialogTitle>
+                      <DialogDescription>
+                        Ver detalhes e estatísticas do motorista {driver.name}.
+                      </DialogDescription>
+                    </DialogHeader>
                     <DriverProfileContent driver={driver as Driver} rank={rank} />
                   </DialogContent>
                 </Dialog>
