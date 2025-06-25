@@ -24,6 +24,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip as UiTooltip, TooltipContent as UiTooltipContent, TooltipProvider, TooltipTrigger as UiTooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
 
 
 const chartConfig = {
@@ -267,7 +268,9 @@ export default function DashboardPage() {
           if (!date?.from) {
             return true;
           }
-          const deliveryDate = new Date(delivery.date);
+          const [year, month, day] = delivery.date.split('-').map(Number);
+          const deliveryDate = new Date(year, month - 1, day);
+          
           const interval = {
             start: startOfDay(date.from),
             end: date.to ? startOfDay(date.to) : startOfDay(date.from),
@@ -437,6 +440,21 @@ export default function DashboardPage() {
           ) : (
             sortedDrivers.map((driver, index) => {
               const rank = index + 1;
+              const weeklyGoal = 200;
+
+              const today = startOfDay(new Date());
+              const sevenDaysAgo = addDays(today, -6);
+              
+              const weeklyDeliveries = driver.dailyDeliveries
+                .filter(d => {
+                  const [year, month, day] = d.date.split('-').map(Number);
+                  const deliveryDate = new Date(year, month - 1, day);
+                  return isWithinInterval(deliveryDate, { start: sevenDaysAgo, end: today });
+                })
+                .reduce((sum, d) => sum + d.deliveries, 0);
+              
+              const weeklyProgress = (weeklyDeliveries / weeklyGoal) * 100;
+
               return (
                 <Dialog key={driver.id}>
                   <DialogTrigger asChild>
@@ -451,7 +469,16 @@ export default function DashboardPage() {
                         </Avatar>
                         <div className="flex-1">
                           <p className="font-semibold">{driver.name}</p>
-                          <p className="text-sm text-muted-foreground">{driver.totalDeliveries.toLocaleString()} entregas</p>
+                          <p className="text-sm text-muted-foreground">
+                            {driver.totalDeliveries.toLocaleString()} entregas {date ? '(período)' : '(geral)'}
+                          </p>
+                          <div className="mt-2 space-y-1">
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>Progresso Semanal</span>
+                              <span className="font-semibold text-primary">{weeklyDeliveries} / {weeklyGoal}</span>
+                            </div>
+                            <Progress value={weeklyProgress} className="h-2" />
+                          </div>
                         </div>
                         <Button variant="ghost" size="icon" className="shrink-0" onClick={(e) => openDeliveriesDialog(e, driver as Driver)}>
                             <PlusCircle className="h-5 w-5" />
