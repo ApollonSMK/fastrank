@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { Line, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { rankingHistory } from "@/lib/mock-data"
 import {
@@ -7,6 +8,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const chartConfig = {
   rank: {
@@ -16,6 +18,16 @@ const chartConfig = {
 }
 
 export default function RankingHistoryChart() {
+  const [isMounted, setIsMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  if (!isMounted) {
+    return <Skeleton className="h-[250px] w-full" />
+  }
+
   return (
     <ChartContainer config={chartConfig} className="h-[250px] w-full">
       <ResponsiveContainer>
