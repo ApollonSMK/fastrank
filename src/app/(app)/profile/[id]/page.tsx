@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { DateRange } from "react-day-picker";
-import { addDays, format } from "date-fns";
+import { addDays, format, isWithinInterval, startOfDay } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -77,9 +77,10 @@ export default function DriverProfilePage() {
   }, [params.id]);
 
   useEffect(() => {
+    const today = new Date();
     setDate({
-      from: addDays(new Date(), -6),
-      to: new Date(),
+      from: addDays(today, -6),
+      to: today,
     });
   }, []);
 
@@ -118,7 +119,7 @@ export default function DriverProfilePage() {
         if (!date?.from) return true;
         const from = date.from;
         const to = date.to ?? from;
-        return d.dateObj >= from && d.dateObj <= to;
+        return isWithinInterval(d.dateObj, { start: startOfDay(from), end: startOfDay(to) });
     })
     .map(d => ({
       date: d.dateObj.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' }),
@@ -141,6 +142,42 @@ export default function DriverProfilePage() {
           <p className="text-lg text-muted-foreground">Posição no Ranking: <span className="font-bold text-primary">#{rank}</span></p>
         </div>
       </div>
+      
+      <Card>
+        <CardHeader className='pb-4'>
+            <CardTitle>Conquistas</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <TooltipProvider>
+                {achievementIds.length > 0 ? (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 text-center">
+                    {achievementIds.map(id => {
+                    const achievement = achievements[id];
+                    if (!achievement) return null;
+                    const Icon = iconMap[achievement.icon];
+                    return (
+                        <UiTooltip key={id}>
+                            <UiTooltipTrigger asChild>
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-accent/50 border-2 border-accent text-accent-foreground">
+                                        <Icon className="h-6 w-6 text-primary" />
+                                    </div>
+                                    <span className="text-xs font-medium">{achievement.name}</span>
+                                </div>
+                            </UiTooltipTrigger>
+                            <UiTooltipContent>
+                                <p>{achievement.description}</p>
+                            </UiTooltipContent>
+                        </UiTooltip>
+                    );
+                    })}
+                </div>
+                ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma conquista ainda.</p>
+                )}
+            </TooltipProvider>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-2 gap-4">
         {stats.map((stat, index) => (
@@ -215,42 +252,6 @@ export default function DriverProfilePage() {
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-            <CardTitle>Conquistas</CardTitle>
-        </CardHeader>
-        <CardContent>
-            <TooltipProvider>
-                {achievementIds.length > 0 ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 text-center">
-                    {achievementIds.map(id => {
-                    const achievement = achievements[id];
-                    if (!achievement) return null;
-                    const Icon = iconMap[achievement.icon];
-                    return (
-                        <UiTooltip key={id}>
-                            <UiTooltipTrigger asChild>
-                                <div className="flex flex-col items-center gap-2">
-                                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-accent/50 border-2 border-accent text-accent-foreground">
-                                        <Icon className="h-8 w-8 text-primary" />
-                                    </div>
-                                    <span className="text-xs font-medium">{achievement.name}</span>
-                                </div>
-                            </UiTooltipTrigger>
-                            <UiTooltipContent>
-                                <p>{achievement.description}</p>
-                            </UiTooltipContent>
-                        </UiTooltip>
-                    );
-                    })}
-                </div>
-                ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma conquista ainda.</p>
-                )}
-            </TooltipProvider>
         </CardContent>
       </Card>
     </div>

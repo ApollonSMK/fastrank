@@ -56,9 +56,10 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
 
   useEffect(() => {
     setIsMounted(true);
+    const today = new Date();
     setDate({
-      from: addDays(new Date(), -6),
-      to: new Date(),
+      from: addDays(today, -6),
+      to: today,
     });
   }, []);
 
@@ -82,7 +83,7 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
       .filter(d => {
           const from = date.from!;
           const to = date.to ?? from;
-          return d.dateObj >= from && d.dateObj <= to;
+          return isWithinInterval(d.dateObj, { start: startOfDay(from), end: startOfDay(to) });
       })
       .map(d => ({
         date: d.dateObj.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' }),
@@ -102,6 +103,42 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
           <p className="text-lg text-muted-foreground">Posição no Ranking: <span className="font-bold text-primary">#{rank}</span></p>
         </div>
       </div>
+      
+      <Card>
+        <CardHeader className='pb-4'>
+            <CardTitle>Conquistas</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <TooltipProvider>
+                {achievementIds.length > 0 ? (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 text-center">
+                    {achievementIds.map(id => {
+                    const achievement = achievements[id];
+                    if (!achievement) return null;
+                    const Icon = iconMap[achievement.icon];
+                    return (
+                        <UiTooltip key={id}>
+                            <UiTooltipTrigger asChild>
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-accent/10 border-2 border-accent text-accent-foreground">
+                                        <Icon className="h-6 w-6 text-accent drop-shadow-[0_0_5px_hsl(var(--accent))]" />
+                                    </div>
+                                    <span className="text-xs font-medium">{achievement.name}</span>
+                                </div>
+                            </UiTooltipTrigger>
+                            <UiTooltipContent>
+                                <p>{achievement.description}</p>
+                            </UiTooltipContent>
+                        </UiTooltip>
+                    );
+                    })}
+                </div>
+                ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma conquista ainda.</p>
+                )}
+            </TooltipProvider>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-2 gap-4">
         {stats.map((stat, index) => (
@@ -180,42 +217,6 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
               </ResponsiveContainer>
             </ChartContainer>
           )}
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-            <CardTitle>Conquistas</CardTitle>
-        </CardHeader>
-        <CardContent>
-            <TooltipProvider>
-                {achievementIds.length > 0 ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 text-center">
-                    {achievementIds.map(id => {
-                    const achievement = achievements[id];
-                    if (!achievement) return null;
-                    const Icon = iconMap[achievement.icon];
-                    return (
-                        <UiTooltip key={id}>
-                            <UiTooltipTrigger asChild>
-                                <div className="flex flex-col items-center gap-2">
-                                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-accent/10 border-2 border-accent text-accent-foreground">
-                                        <Icon className="h-8 w-8 text-accent drop-shadow-[0_0_5px_hsl(var(--accent))]" />
-                                    </div>
-                                    <span className="text-xs font-medium">{achievement.name}</span>
-                                </div>
-                            </UiTooltipTrigger>
-                            <UiTooltipContent>
-                                <p>{achievement.description}</p>
-                            </UiTooltipContent>
-                        </UiTooltip>
-                    );
-                    })}
-                </div>
-                ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma conquista ainda.</p>
-                )}
-            </TooltipProvider>
         </CardContent>
       </Card>
     </div>
@@ -477,8 +478,7 @@ export default function DashboardPage() {
               
               const weeklyDeliveries = driver.dailyDeliveries
                 .filter(d => {
-                  const [year, month, day] = d.date.split('-').map(Number);
-                  const deliveryDate = new Date(year, month - 1, day);
+                  const deliveryDate = new Date(d.date + 'T00:00:00');
                   return isWithinInterval(deliveryDate, { start: sevenDaysAgo, end: today });
                 })
                 .reduce((sum, d) => sum + d.deliveries, 0);
@@ -622,7 +622,7 @@ export default function DashboardPage() {
                             <TableBody>
                                 {driverForDeliveries.dailyDeliveries.map(delivery => (
                                     <TableRow key={delivery.date}>
-                                        <TableCell>{format(new Date(delivery.date), "dd/MM/yyyy")}</TableCell>
+                                        <TableCell>{format(new Date(delivery.date + 'T00:00:00'), "dd/MM/yyyy")}</TableCell>
                                         <TableCell>{delivery.deliveries}</TableCell>
                                         <TableCell className="text-right">
                                             <Button variant="ghost" size="icon" onClick={() => handleRemoveDelivery(delivery.date)}>
