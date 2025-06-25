@@ -2,6 +2,7 @@
 "use client";
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -77,10 +78,12 @@ const CompetitionCard = ({ competition }: { competition: Competition }) => {
                 </div>
             </CardContent>
             <CardFooter>
-                <Button className="w-full" disabled={status === 'Próxima'}>
-                    <Trophy className="mr-2 h-4 w-4" />
-                    Ver Leaderboard
-                </Button>
+                 <Link href={`/competitions/${competition.id}`} className={`w-full ${status === 'Próxima' ? 'pointer-events-none' : ''}`}>
+                    <Button className="w-full" disabled={status === 'Próxima'}>
+                        <Trophy className="mr-2 h-4 w-4" />
+                        Ver Leaderboard
+                    </Button>
+                </Link>
             </CardFooter>
         </Card>
     );
@@ -153,3 +156,5 @@ export default function CompetitionsPage() {
         </div>
     );
 }
+
+    

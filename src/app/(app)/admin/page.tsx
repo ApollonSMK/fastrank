@@ -188,6 +188,7 @@ const TeamsManagement = () => {
 }
 
 const CompetitionsManagement = () => {
+  const router = useRouter();
   const [competitions, setCompetitions] = useState<Competition[]>(initialCompetitions);
   const [isAddCompetitionDialogOpen, setIsAddCompetitionDialogOpen] = useState(false);
 
@@ -371,7 +372,7 @@ const CompetitionsManagement = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Ver Leaderboard</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/competitions/${comp.id}`)}>Ver Leaderboard</DropdownMenuItem>
                           <DropdownMenuItem>Editar</DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive">Remover</DropdownMenuItem>
                         </DropdownMenuContent>
@@ -408,3 +409,5 @@ export default function AdminPage() {
     </>
   );
 }
+
+    
