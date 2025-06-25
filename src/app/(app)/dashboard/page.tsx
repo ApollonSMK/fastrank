@@ -23,6 +23,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip as UiTooltip, TooltipContent as UiTooltipContent, TooltipProvider, TooltipTrigger as UiTooltipTrigger } from "@/components/ui/tooltip";
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 const chartConfig = {
@@ -50,8 +51,10 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
   const { name, trips, safetyScore, efficiency, dailyDeliveries, achievementIds } = driver;
 
   const [date, setDate] = React.useState<DateRange | undefined>();
+  const [isMounted, setIsMounted] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    setIsMounted(true);
     setDate({
       from: addDays(new Date(), -6),
       to: new Date(),
@@ -67,21 +70,24 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
     { label: "Eficiência", value: `${efficiency}%`, icon: Fuel },
   ];
 
-  const chartData = dailyDeliveries
-    .map(d => {
-        const [year, month, day] = d.date.split('-').map(Number);
-        return { ...d, dateObj: new Date(year, month - 1, day) };
-    })
-    .filter(d => {
-        if (!date?.from) return true;
-        const from = date.from;
-        const to = date.to ?? from;
-        return d.dateObj >= from && d.dateObj <= to;
-    })
-    .map(d => ({
-      date: d.dateObj.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' }),
-      deliveries: d.deliveries,
-    }));
+  const chartData = React.useMemo(() => {
+    if (!date?.from) return [];
+    
+    return dailyDeliveries
+      .map(d => {
+          const [year, month, day] = d.date.split('-').map(Number);
+          return { ...d, dateObj: new Date(year, month - 1, day) };
+      })
+      .filter(d => {
+          const from = date.from!;
+          const to = date.to ?? from;
+          return d.dateObj >= from && d.dateObj <= to;
+      })
+      .map(d => ({
+        date: d.dateObj.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' }),
+        deliveries: d.deliveries,
+      }));
+  }, [dailyDeliveries, date]);
 
   return (
     <div className="space-y-6">
@@ -152,23 +158,27 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
           </div>
         </CardHeader>
         <CardContent className="pl-2">
-          <ChartContainer config={chartConfig} className="h-[200px] w-full">
-            <ResponsiveContainer>
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid vertical={false} />
-                <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis />
-                <Tooltip
-                  cursor={{ fill: 'hsl(var(--muted))' }}
-                  content={<ChartTooltipContent 
-                    formatter={(value) => `${value} entregas`}
-                    indicator="line" 
-                  />}
-                />
-                <Bar dataKey="deliveries" radius={4} fill="var(--color-deliveries)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartContainer>
+          {!isMounted ? (
+             <Skeleton className="h-[200px] w-full" />
+          ) : (
+            <ChartContainer config={chartConfig} className="h-[200px] w-full">
+              <ResponsiveContainer>
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
+                  <YAxis />
+                  <Tooltip
+                    cursor={{ fill: 'hsl(var(--muted))' }}
+                    content={<ChartTooltipContent 
+                      formatter={(value) => `${value} entregas`}
+                      indicator="line" 
+                    />}
+                  />
+                  <Bar dataKey="deliveries" radius={4} fill="var(--color-deliveries)" />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          )}
         </CardContent>
       </Card>
       
@@ -212,12 +222,40 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
 };
 
 
+function RankingSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[...Array(5)].map((_, i) => (
+        <Card key={i}>
+          <CardContent className="flex animate-pulse items-center gap-4 p-4">
+            <Skeleton className="h-8 w-8" />
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-1/2 rounded" />
+              <Skeleton className="h-3 w-1/4 rounded" />
+            </div>
+            <Skeleton className="h-10 w-10" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+
 export default function DashboardPage() {
   const [drivers, setDrivers] = useState<Driver[]>(initialDrivers);
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const [date, setDate] = useState<DateRange | undefined>(undefined);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const sortedDrivers = React.useMemo(() => {
+    if (!isMounted) return [];
+
     const teamFilteredDrivers =
       selectedTeamId === 'all'
         ? [...drivers]
@@ -245,7 +283,7 @@ export default function DashboardPage() {
     });
 
     return driversWithDeliveries.sort((a, b) => b.totalDeliveries - a.totalDeliveries);
-  }, [drivers, selectedTeamId, date]);
+  }, [isMounted, drivers, selectedTeamId, date]);
 
   const [isDeliveriesDialogOpen, setIsDeliveriesDialogOpen] = useState(false);
   const [selectedDriverForDeliveries, setSelectedDriverForDeliveries] = useState<Driver | null>(null);
@@ -374,7 +412,7 @@ export default function DashboardPage() {
                                         format(date.from, "dd/MM/y")
                                     )
                                 ) : (
-                                    <span>Escolha um período</span>
+                                    <span>Todo o período</span>
                                 )}
                             </Button>
                         </PopoverTrigger>
@@ -394,36 +432,40 @@ export default function DashboardPage() {
         </Card>
 
         <div className="space-y-3">
-          {sortedDrivers.map((driver, index) => {
-            const rank = index + 1;
-            return (
-              <Dialog key={driver.id}>
-                <DialogTrigger asChild>
-                  <Card className="transition-all duration-200 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/20 cursor-pointer">
-                    <CardContent className="flex items-center gap-4 p-4">
-                      <div className="flex h-8 w-8 items-center justify-center font-bold">
-                        {getRankIndicator(rank)}
-                      </div>
-                      <Avatar>
-                        <AvatarImage src={`https://placehold.co/40x40.png`} data-ai-hint="person portrait" alt={driver.name} />
-                        <AvatarFallback>{driver.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <p className="font-semibold">{driver.name}</p>
-                        <p className="text-sm text-muted-foreground">{driver.totalDeliveries.toLocaleString()} entregas</p>
-                      </div>
-                      <Button variant="ghost" size="icon" className="shrink-0" onClick={(e) => openDeliveriesDialog(e, driver as Driver)}>
-                          <PlusCircle className="h-5 w-5" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </DialogTrigger>
-                <DialogContent className="max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
-                  <DriverProfileContent driver={driver as Driver} rank={rank} />
-                </DialogContent>
-              </Dialog>
-            )
-          })}
+          {!isMounted ? (
+            <RankingSkeleton />
+          ) : (
+            sortedDrivers.map((driver, index) => {
+              const rank = index + 1;
+              return (
+                <Dialog key={driver.id}>
+                  <DialogTrigger asChild>
+                    <Card className="transition-all duration-200 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/20 cursor-pointer">
+                      <CardContent className="flex items-center gap-4 p-4">
+                        <div className="flex h-8 w-8 items-center justify-center font-bold">
+                          {getRankIndicator(rank)}
+                        </div>
+                        <Avatar>
+                          <AvatarImage src={`https://placehold.co/40x40.png`} data-ai-hint="person portrait" alt={driver.name} />
+                          <AvatarFallback>{driver.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <p className="font-semibold">{driver.name}</p>
+                          <p className="text-sm text-muted-foreground">{driver.totalDeliveries.toLocaleString()} entregas</p>
+                        </div>
+                        <Button variant="ghost" size="icon" className="shrink-0" onClick={(e) => openDeliveriesDialog(e, driver as Driver)}>
+                            <PlusCircle className="h-5 w-5" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+                    <DriverProfileContent driver={driver as Driver} rank={rank} />
+                  </DialogContent>
+                </Dialog>
+              )
+            })
+          )}
         </div>
       </div>
 
