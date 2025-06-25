@@ -328,6 +328,36 @@ export default function DashboardPage() {
     const driverInMock = initialDrivers.find(d => d.id === driverForDeliveries.id);
     if (driverInMock) {
       driverInMock.dailyDeliveries = updateDriverDeliveries(driverInMock);
+
+      driverInMock.notifications.unshift({
+        id: Date.now(),
+        title: "Entregas Atualizadas",
+        description: `O seu registo de ${data.deliveries} entregas para ${format(data.date, 'dd/MM/yyyy')} foi adicionado.`,
+        read: false,
+        date: new Date().toISOString(),
+      });
+
+      const totalDeliveries = driverInMock.dailyDeliveries.reduce((sum, d) => sum + d.deliveries, 0);
+
+      if (totalDeliveries >= 150 && !driverInMock.achievementIds.includes('delivery-150')) {
+          driverInMock.achievementIds.push('delivery-150');
+          driverInMock.notifications.unshift({
+              id: Date.now() + 1,
+              title: "Nova Conquista!",
+              description: `Parabéns! Desbloqueou: "${achievements['delivery-150'].name}"`,
+              read: false,
+              date: new Date().toISOString()
+          });
+      } else if (totalDeliveries >= 50 && !driverInMock.achievementIds.includes('delivery-50')) {
+          driverInMock.achievementIds.push('delivery-50');
+          driverInMock.notifications.unshift({
+              id: Date.now() + 1,
+              title: "Nova Conquista!",
+              description: `Parabéns! Desbloqueou: "${achievements['delivery-50'].name}"`,
+              read: false,
+              date: new Date().toISOString()
+          });
+      }
     }
     
     deliveryForm.reset();

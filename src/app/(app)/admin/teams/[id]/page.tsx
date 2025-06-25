@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { teams, drivers as initialDrivers, Driver, DailyDelivery } from '@/lib/mock-data';
+import { teams, drivers as initialDrivers, Driver, DailyDelivery, achievements } from '@/lib/mock-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -126,6 +126,8 @@ export default function TeamDetailsPage() {
       safetyScore: 100,
       efficiency: 100,
       dailyDeliveries: [],
+      notifications: [],
+      achievementIds: [],
     };
 
     const updatedDrivers = [...drivers, newDriver];
@@ -212,6 +214,36 @@ export default function TeamDetailsPage() {
     const driverInMock = initialDrivers.find(d => d.id === driverForDeliveries.id);
     if (driverInMock) {
       driverInMock.dailyDeliveries = updateDriverDeliveries(driverInMock);
+
+      driverInMock.notifications.unshift({
+        id: Date.now(),
+        title: "Entregas Atualizadas",
+        description: `Registo de ${data.deliveries} entregas para ${format(data.date, 'dd/MM/yyyy')} foi adicionado por um administrador.`,
+        read: false,
+        date: new Date().toISOString(),
+      });
+
+      const totalDeliveries = driverInMock.dailyDeliveries.reduce((sum, d) => sum + d.deliveries, 0);
+
+      if (totalDeliveries >= 150 && !driverInMock.achievementIds.includes('delivery-150')) {
+          driverInMock.achievementIds.push('delivery-150');
+          driverInMock.notifications.unshift({
+              id: Date.now() + 1,
+              title: "Nova Conquista!",
+              description: `Parabéns! Desbloqueou: "${achievements['delivery-150'].name}"`,
+              read: false,
+              date: new Date().toISOString()
+          });
+      } else if (totalDeliveries >= 50 && !driverInMock.achievementIds.includes('delivery-50')) {
+          driverInMock.achievementIds.push('delivery-50');
+          driverInMock.notifications.unshift({
+              id: Date.now() + 1,
+              title: "Nova Conquista!",
+              description: `Parabéns! Desbloqueou: "${achievements['delivery-50'].name}"`,
+              read: false,
+              date: new Date().toISOString()
+          });
+      }
     }
     
     deliveryForm.reset();
