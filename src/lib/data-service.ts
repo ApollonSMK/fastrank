@@ -1,7 +1,7 @@
 
 import { db, auth } from './firebase';
 import { collection, getDocs, doc, getDoc, setDoc, query, where, addDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import type { Driver, Team, Competition, Challenge, RankHistory } from './data-types';
 
 // Helper function to convert Firestore doc to a usable object with ID
@@ -168,11 +168,20 @@ export async function getRankingHistory(): Promise<RankHistory[]> {
 
 
 // --- Logged In User ---
-export async function getLoggedInDriver(): Promise<Driver | null> {
-    const user = auth.currentUser;
-    if (user) {
-        // The user's UID is used as the document ID
-        return getDriver(user.uid);
-    }
-    return null;
+export function getLoggedInDriver(): Promise<Driver | null> {
+    return new Promise((resolve, reject) => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            unsubscribe(); // We only need to check once.
+            if (user) {
+                try {
+                    const driver = await getDriver(user.uid);
+                    resolve(driver);
+                } catch (error) {
+                    reject(error);
+                }
+            } else {
+                resolve(null);
+            }
+        }, (error) => reject(error)); // Handle initialization errors
+    });
 }
