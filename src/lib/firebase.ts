@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { getAuth, onAuthStateChanged, type User } from "firebase/auth";
 
 // TODO: For a production application, move this configuration to environment variables.
 const firebaseConfig = {
@@ -19,5 +19,18 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+
+
+/**
+ * A promise that resolves with the Firebase user object once the auth state has been determined.
+ * This is useful for avoiding race conditions on the initial page load.
+ */
+export const authInitialized = new Promise<User | null>(resolve => {
+  const unsubscribe = onAuthStateChanged(auth, user => {
+    resolve(user);
+    unsubscribe();
+  });
+});
+
 
 export { app, db, auth };
