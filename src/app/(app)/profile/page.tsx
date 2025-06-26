@@ -2,10 +2,11 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getLoggedInDriver, Driver, achievements } from "@/lib/mock-data";
-import { TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, Rocket, Award, Trophy, CalendarDays, Wallet, Star } from "lucide-react";
+import { TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, Rocket, Award, Trophy, CalendarDays, Wallet, Star, LogOut } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -63,6 +64,7 @@ function ProfileSkeleton() {
 }
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [driver, setDriver] = useState<Driver | undefined>(undefined);
   const [date, setDate] = useState<DateRange | undefined>();
 
@@ -75,6 +77,13 @@ export default function ProfilePage() {
       to: today,
     });
   }, []);
+
+  const handleLogout = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('loggedInDriverId');
+      router.push('/');
+    }
+  };
 
   if (!driver) {
     return <ProfileSkeleton />;
@@ -252,6 +261,11 @@ export default function ProfilePage() {
           </ChartContainer>
         </CardContent>
       </Card>
+
+      <Button variant="outline" onClick={handleLogout} className="w-full">
+        <LogOut className="mr-2 h-4 w-4" />
+        Terminar Sessão
+      </Button>
     </div>
   );
 }
