@@ -56,7 +56,7 @@ const FormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
   licensePlate: z.string().regex(/^[A-Z]{2}-\d{2}-[A-Z]{2}$/, { message: 'Formato de matrícula inválido (ex: AA-11-BB).' }),
   vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
-  driverLoginId: z.string().min(3, { message: 'O ID de login deve ter pelo menos 3 caracteres.' }),
+  email: z.string().email({ message: 'Por favor, insira um email válido.' }),
   password: z.string().min(6, { message: 'A senha deve ter pelo menos 6 caracteres.' }),
 });
 
@@ -111,7 +111,7 @@ export default function TeamDetailsPage() {
       name: "",
       licensePlate: "",
       vehicleModel: "",
-      driverLoginId: "",
+      email: "",
       password: "",
     },
   });
@@ -156,12 +156,15 @@ export default function TeamDetailsPage() {
   }
 
   const onSubmit: SubmitHandler<FormValues> = async (data) => {
+    // Note: creating a user via the admin panel will sign the admin out
+    // and sign the new user in. This is a limitation of the Firebase client SDK.
+    // The admin will need to log back in.
     const newDriver: Omit<Driver, 'id'> = {
       name: data.name,
+      email: data.email,
       licensePlate: data.licensePlate.toUpperCase(),
       vehicleModel: data.vehicleModel,
       teamId: team.id,
-      driverLoginId: data.driverLoginId,
       avatar: '/avatars/default.png',
       rank: 999, // Rank should be recalculated globally
       points: 0,
@@ -355,12 +358,12 @@ export default function TeamDetailsPage() {
                 />
                 <FormField
                   control={form.control}
-                  name="driverLoginId"
+                  name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>ID de Login</FormLabel>
+                      <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ex: joao.silva" {...field} />
+                        <Input type="email" placeholder="Ex: joao.silva@empresa.com" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

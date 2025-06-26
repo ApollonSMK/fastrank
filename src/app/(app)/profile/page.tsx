@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getLoggedInDriver } from "@/lib/data-service";
+import { getLoggedInDriver, signOutUser } from "@/lib/data-service";
 import { Driver, achievements } from "@/lib/data-types";
 import { TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, Rocket, Award, Trophy, CalendarDays, Wallet, Star, LogOut } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
@@ -85,11 +85,9 @@ export default function ProfilePage() {
     fetchDriver();
   }, []);
 
-  const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('loggedInDriverId');
-      router.push('/');
-    }
+  const handleLogout = async () => {
+    await signOutUser();
+    router.push('/');
   };
 
   if (isLoading || !driver) {

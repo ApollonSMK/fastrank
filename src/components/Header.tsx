@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { getLoggedInDriver } from "@/lib/data-service"
+import { getLoggedInDriver, updateDriver } from "@/lib/data-service"
 import { Driver, Notification } from "@/lib/data-types"
 import { formatDistanceToNow } from "date-fns";
 import { pt } from 'date-fns/locale';
@@ -36,15 +36,16 @@ export default function Header() {
   
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const handleOpenChange = (open: boolean) => {
+  const handleOpenChange = async (open: boolean) => {
     if (open && unreadCount > 0 && driver) {
-      // This part is tricky without a proper backend update.
-      // For now, we'll just update the local state.
-      // A real implementation would call updateDriver().
-      setTimeout(() => {
-          const updatedNotifications = driver.notifications.map(n => ({...n, read: true}));
-          setNotifications(updatedNotifications);
-      }, 1500);
+      const updatedNotifications = driver.notifications.map(n => ({...n, read: true}));
+      
+      try {
+        await updateDriver(driver.id, { notifications: updatedNotifications });
+        setNotifications(updatedNotifications); // Optimistically update UI
+      } catch (error) {
+        console.error("Failed to mark notifications as read", error);
+      }
     }
   }
 

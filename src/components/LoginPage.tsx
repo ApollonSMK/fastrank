@@ -10,23 +10,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Car } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { addDriver } from '@/lib/data-service';
-import type { Driver } from '@/lib/data-types';
+import { signInUser, signUpUser } from '@/lib/data-service';
 
 export default function LoginPage() {
     const router = useRouter();
     const { toast } = useToast();
     
     // Login State
-    const [driverId, setDriverId] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
     // Registration State
     const [regName, setRegName] = useState('');
-    const [regDriverId, setRegDriverId] = useState('');
+    const [regEmail, setRegEmail] = useState('');
     const [regPassword, setRegPassword] = useState('');
     const [isRegLoading, setIsRegLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('login');
@@ -35,33 +32,15 @@ export default function LoginPage() {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-
         try {
-            const q = query(
-                collection(db, "drivers"), 
-                where("driverLoginId", "==", driverId), 
-                where("password", "==", password)
-            );
-            const querySnapshot = await getDocs(q);
-
-            if (!querySnapshot.empty) {
-                const driverDoc = querySnapshot.docs[0];
-                localStorage.setItem('loggedInDriverId', driverDoc.id);
-                router.push('/dashboard');
-            } else {
-                toast({
-                    variant: "destructive",
-                    title: "Login falhou",
-                    description: "ID do motorista ou senha incorretos.",
-                });
-                setIsLoading(false);
-            }
-        } catch (error) {
+            await signInUser(email, password);
+            router.push('/dashboard');
+        } catch (error: any) {
             console.error("Login error: ", error);
              toast({
                 variant: "destructive",
-                title: "Erro de Login",
-                description: "Ocorreu um erro ao tentar fazer login. Verifique a consola.",
+                title: "Login falhou",
+                description: "Email ou senha incorretos. Por favor, tente novamente.",
             });
             setIsLoading(false);
         }
@@ -72,54 +51,26 @@ export default function LoginPage() {
         setIsRegLoading(true);
 
         try {
-            const q = query(collection(db, "drivers"), where("driverLoginId", "==", regDriverId));
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-                toast({
-                    variant: "destructive",
-                    title: "Registo Falhou",
-                    description: "Este ID de motorista já existe.",
-                });
-                setIsRegLoading(false);
-                return;
-            }
-
-            const newDriverData: Omit<Driver, 'id'> = {
-                name: regName,
-                driverLoginId: regDriverId,
-                avatar: '/avatars/default.png',
-                rank: 999,
-                points: 0,
-                moneyBalance: 0,
-                trips: 0,
-                safetyScore: 100,
-                efficiency: 100,
-                licensePlate: 'N/A',
-                vehicleModel: 'N/A',
-                teamId: '',
-                dailyDeliveries: [],
-                notifications: [],
-                achievementIds: [],
-            };
-
-            await addDriver(newDriverData, regPassword);
-
+            await signUpUser({ name: regName, email: regEmail }, regPassword);
             toast({
                 title: "Conta Criada!",
                 description: "Pode agora fazer login com as suas novas credenciais.",
             });
             
             setRegName('');
-            setRegDriverId('');
+            setRegEmail('');
             setRegPassword('');
             setActiveTab('login');
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Registration error: ", error);
+            const description = error.code === 'auth/email-already-in-use' 
+                ? "Este email já está a ser utilizado." 
+                : "Ocorreu um erro ao tentar criar a conta.";
             toast({
                 variant: "destructive",
-                title: "Erro de Registo",
-                description: "Ocorreu um erro ao tentar criar a conta.",
+                title: "Registo Falhou",
+                description: description,
             });
         } finally {
             setIsRegLoading(false);
@@ -146,15 +97,15 @@ export default function LoginPage() {
                             <form onSubmit={handleLogin}>
                                 <CardContent className="space-y-4 pt-6 px-0">
                                     <div className="space-y-2">
-                                        <Label htmlFor="driverId">ID do Motorista</Label>
+                                        <Label htmlFor="email">Email</Label>
                                         <Input 
-                                            id="driverId" 
-                                            type="text" 
-                                            placeholder="Seu ID de motorista" 
-                                            value={driverId}
-                                            onChange={(e) => setDriverId(e.target.value)}
+                                            id="email" 
+                                            type="email" 
+                                            placeholder="o.seu@email.com" 
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
                                             required
-                                            autoComplete="username"
+                                            autoComplete="email"
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -189,17 +140,19 @@ export default function LoginPage() {
                                             value={regName}
                                             onChange={(e) => setRegName(e.target.value)}
                                             required
+                                            autoComplete="name"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="reg-driverId">ID de Motorista</Label>
+                                        <Label htmlFor="reg-email">Email</Label>
                                         <Input 
-                                            id="reg-driverId" 
-                                            type="text" 
-                                            placeholder="Crie um ID único" 
-                                            value={regDriverId}
-                                            onChange={(e) => setRegDriverId(e.target.value)}
+                                            id="reg-email" 
+                                            type="email" 
+                                            placeholder="o.seu@email.com" 
+                                            value={regEmail}
+                                            onChange={(e) => setRegEmail(e.target.value)}
                                             required
+                                            autoComplete="email"
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -207,10 +160,11 @@ export default function LoginPage() {
                                         <Input 
                                             id="reg-password" 
                                             type="password" 
-                                            placeholder="Crie uma senha segura" 
+                                            placeholder="Crie uma senha segura (mín. 6 caracteres)" 
                                             value={regPassword}
                                             onChange={(e) => setRegPassword(e.target.value)}
                                             required
+                                            autoComplete="new-password"
                                         />
                                     </div>
                                 </CardContent>

@@ -39,6 +39,7 @@ export type Challenge = {
 export type Driver = {
   id: string; // Firestore ID
   name: string;
+  email: string;
   avatar: string;
   rank: number;
   points: number;
@@ -49,7 +50,6 @@ export type Driver = {
   teamId?: string;
   licensePlate: string;
   vehicleModel: string;
-  driverLoginId: string;
   // password is not stored on the client type
   dailyDeliveries: DailyDelivery[];
   achievementIds: string[];
