@@ -15,9 +15,11 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Swords, PlusCircle, Check, X } from 'lucide-react';
-import { format, formatDistanceToNowStrict } from 'date-fns';
+import { Swords, PlusCircle, Check, X, Crown } from 'lucide-react';
+import { format, formatDistanceToNowStrict, isWithinInterval, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 const challengeFormSchema = z.object({
   opponentId: z.string().min(1, "É obrigatório selecionar um oponente."),
@@ -42,20 +44,48 @@ const ChallengeCard = ({ challenge, currentDriverId, onAction }: { challenge: Ch
     if (!challenger || !opponent) return null;
 
     const isCurrentUserOpponent = challenge.opponentId === currentDriverId;
+    const isCompleted = challenge.status === 'completed';
+    const winner = isCompleted ? allDrivers.find(d => d.id === challenge.winnerId) : null;
+
     const wagerLabel = challenge.wagerType === 'points' ? `${challenge.wagerAmount} pontos` : `€${challenge.wagerAmount.toFixed(2)}`;
-    const duration = formatDistanceToNowStrict(new Date(challenge.endDate), { locale: pt, unit: 'day' });
+    
+    let durationLabel = '';
+    if (challenge.status === 'active' || challenge.status === 'pending') {
+        const endDate = parseISO(challenge.endDate);
+        if (endDate > new Date()) {
+            durationLabel = `Termina em ${formatDistanceToNowStrict(endDate, { locale: pt, addSuffix: false })}`;
+        } else {
+            durationLabel = 'A finalizar...';
+        }
+    }
+
+    const getStatusInfo = (): { text: string; color: string } => {        
+        switch (challenge.status) {
+            case 'pending': return { text: 'Pendente', color: 'bg-yellow-500' };
+            case 'active': return { text: 'Ativo', color: 'bg-green-500' };
+            case 'completed': return { text: 'Terminado', color: 'bg-blue-500' };
+            case 'declined': return { text: 'Recusado', color: 'bg-red-500' };
+            default: return { text: 'Desconhecido', color: 'bg-muted-foreground' };
+        }
+    };
+    const statusInfo = getStatusInfo();
+
 
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center justify-between text-lg">
-                    <span>Desafio {challenge.status === 'pending' ? 'Pendente' : 'Ativo'}</span>
-                    <span className="text-sm font-medium text-muted-foreground">{metricLabels[challenge.metric]}</span>
+                    <span>Desafio {statusInfo.text}</span>
+                    <Badge variant="outline" className="flex items-center gap-2">
+                         <span className={cn("h-2 w-2 rounded-full", statusInfo.color)}></span>
+                         {metricLabels[challenge.metric]}
+                    </Badge>
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex items-center justify-around text-center">
-                    <div className="flex flex-col items-center gap-2">
+                    <div className="relative flex flex-col items-center gap-2">
+                        {winner?.id === challenger.id && <Crown className="absolute -top-4 h-6 w-6 text-yellow-400" />}
                         <Avatar className="h-16 w-16">
                             <AvatarImage src={`https://placehold.co/64x64.png`} data-ai-hint="person portrait" alt={challenger.name} />
                             <AvatarFallback>{challenger.name.charAt(0)}</AvatarFallback>
@@ -63,7 +93,8 @@ const ChallengeCard = ({ challenge, currentDriverId, onAction }: { challenge: Ch
                         <span className="font-semibold">{challenger.name}</span>
                     </div>
                     <div className="text-2xl font-bold text-primary">VS</div>
-                     <div className="flex flex-col items-center gap-2">
+                     <div className="relative flex flex-col items-center gap-2">
+                        {winner?.id === opponent.id && <Crown className="absolute -top-4 h-6 w-6 text-yellow-400" />}
                         <Avatar className="h-16 w-16">
                             <AvatarImage src={`https://placehold.co/64x64.png`} data-ai-hint="person portrait" alt={opponent.name} />
                             <AvatarFallback>{opponent.name.charAt(0)}</AvatarFallback>
@@ -73,7 +104,10 @@ const ChallengeCard = ({ challenge, currentDriverId, onAction }: { challenge: Ch
                 </div>
                  <div className="text-center space-y-2">
                     <p>Aposta: <span className="font-bold text-primary">{wagerLabel}</span></p>
-                    <p>Duração: <span className="font-bold text-muted-foreground">{duration}</span></p>
+                    {durationLabel && <p className="text-sm font-bold text-muted-foreground">{durationLabel}</p>}
+                    {isCompleted && winner && <p className="font-bold text-lg">Vencedor: <span className="text-primary">{winner.name}</span></p>}
+                    {isCompleted && !winner && <p className="font-bold text-lg text-muted-foreground">Empate!</p>}
+
                  </div>
                 {challenge.status === 'pending' && isCurrentUserOpponent && (
                     <div className="flex justify-center gap-4 pt-2">
@@ -93,8 +127,102 @@ export default function ChallengesPage() {
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
     useEffect(() => {
-        setLoggedInDriver(getLoggedInDriver());
+        const driver = getLoggedInDriver();
+        setLoggedInDriver(driver);
+        
+        if (driver) {
+            resolveCompletedChallenges();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const resolveCompletedChallenges = () => {
+        const now = new Date();
+        let challengesUpdated = false;
+
+        const updatedChallenges = initialChallenges.map(c => {
+            if (c.status === 'active' && parseISO(c.endDate) < now) {
+                challengesUpdated = true;
+                const challenger = allDrivers.find(d => d.id === c.challengerId);
+                const opponent = allDrivers.find(d => d.id === c.opponentId);
+
+                if (!challenger || !opponent) return c; // Skip if drivers not found
+
+                const getScore = (driver: Driver) => {
+                    const challengeInterval = { start: parseISO(c.startDate), end: parseISO(c.endDate) };
+                    switch (c.metric) {
+                        case 'deliveries':
+                            return driver.dailyDeliveries
+                                .filter(d => isWithinInterval(parseISO(d.date), challengeInterval))
+                                .reduce((sum, delivery) => sum + delivery.deliveries, 0);
+                        case 'safety': return driver.safetyScore;
+                        case 'efficiency': return driver.efficiency;
+                        default: return 0;
+                    }
+                };
+
+                const challengerScore = getScore(challenger);
+                const opponentScore = getScore(opponent);
+
+                let winner: Driver | null = null;
+                let loser: Driver | null = null;
+
+                if (challengerScore > opponentScore) {
+                    winner = challenger;
+                    loser = opponent;
+                } else if (opponentScore > challengerScore) {
+                    winner = opponent;
+                    loser = challenger;
+                }
+
+                if (winner && loser) {
+                    if (c.wagerType === 'points') {
+                        winner.points += c.wagerAmount;
+                        loser.points -= c.wagerAmount;
+                    } else { // money
+                        winner.moneyBalance += c.wagerAmount;
+                        loser.moneyBalance -= c.wagerAmount;
+                    }
+
+                    winner.notifications.unshift({
+                        id: Date.now() + winner.id,
+                        title: `Desafio Vencido!`,
+                        description: `Ganhou o desafio contra ${loser.name} e recebeu ${c.wagerAmount} ${c.wagerType === 'points' ? 'pontos' : '€'}.`,
+                        read: false, date: new Date().toISOString(), link: '/challenges'
+                    });
+                     loser.notifications.unshift({
+                        id: Date.now() + loser.id,
+                        title: `Desafio Perdido`,
+                        description: `Perdeu o desafio contra ${winner.name}.`,
+                        read: false, date: new Date().toISOString(), link: '/challenges'
+                    });
+
+                    return { ...c, status: 'completed', winnerId: winner.id };
+                } else {
+                    // It's a draw
+                    challenger.notifications.unshift({
+                         id: Date.now() + challenger.id,
+                         title: `Desafio Empatado`,
+                         description: `O seu desafio contra ${opponent.name} terminou em empate.`,
+                         read: false, date: new Date().toISOString(), link: '/challenges'
+                    });
+                    opponent.notifications.unshift({
+                         id: Date.now() + opponent.id,
+                         title: `Desafio Empatado`,
+                         description: `O seu desafio contra ${challenger.name} terminou em empate.`,
+                         read: false, date: new Date().toISOString(), link: '/challenges'
+                    });
+                    return { ...c, status: 'completed', winnerId: null };
+                }
+            }
+            return c;
+        });
+
+        if (challengesUpdated) {
+            setChallenges([...updatedChallenges]);
+        }
+    };
+
 
     const form = useForm<ChallengeFormValues>({
         resolver: zodResolver(challengeFormSchema),
@@ -149,6 +277,11 @@ export default function ChallengesPage() {
         
         challenge.status = action === 'accept' ? 'active' : 'declined';
         
+        if(action === 'accept') {
+            challenge.startDate = new Date().toISOString(); // Reset start date on accept
+            challenge.endDate = new Date(new Date().getTime() + (parseISO(challenge.endDate).getTime() - parseISO(challenge.startDate).getTime())).toISOString();
+        }
+        
         challenger.notifications.unshift({
             id: Date.now(),
             title: `Desafio ${action === 'accept' ? 'Aceite' : 'Recusado'}`,
@@ -175,6 +308,8 @@ export default function ChallengesPage() {
                 else history.push(c);
             }
         });
+        
+        history.sort((a,b) => parseISO(b.endDate).getTime() - parseISO(a.endDate).getTime());
 
         return { pending, active, history };
     }, [challenges, loggedInDriver]);

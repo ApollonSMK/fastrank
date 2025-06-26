@@ -20,7 +20,8 @@ export default function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-10 border-t border-primary/20 bg-card/80 backdrop-blur-sm">
       <div className="container mx-auto grid max-w-3xl grid-cols-4 px-0">
         {navItems.map((item) => {
-          const isActive = pathname.startsWith(item.href) && (item.href !== '/dashboard' || pathname === '/dashboard');
+          const isActive = (pathname === item.href) || (pathname.startsWith(item.href) && item.href !== '/');
+
           return (
             <Link href={item.href} key={item.href}
               className={cn(
