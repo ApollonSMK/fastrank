@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -36,7 +35,6 @@ export default function LoginPage() {
             await signInUser(email, password);
             router.push('/dashboard');
         } catch (error: any) {
-            console.error("Login error: ", error);
              toast({
                 variant: "destructive",
                 title: "Login falhou",
@@ -63,7 +61,6 @@ export default function LoginPage() {
             setActiveTab('login');
 
         } catch (error: any) {
-            console.error("Registration error: ", error);
             const description = error.code === 'auth/email-already-in-use' 
                 ? "Este email já está a ser utilizado." 
                 : "Ocorreu um erro ao tentar criar a conta.";
