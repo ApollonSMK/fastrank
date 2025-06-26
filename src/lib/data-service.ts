@@ -27,6 +27,12 @@ export async function getDriver(id: string): Promise<Driver | null> {
     return driverDoc.exists() ? docToObject<Driver>(driverDoc) : null;
 }
 
+export async function getDriversByTeam(teamId: string): Promise<Driver[]> {
+    const q = query(collection(db, 'drivers'), where('teamId', '==', teamId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => docToObject<Driver>(d));
+}
+
 export async function updateDriver(id: string, data: Partial<Driver>) {
     await updateDoc(doc(db, 'drivers', id), data);
 }
