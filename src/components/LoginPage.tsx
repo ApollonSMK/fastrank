@@ -9,7 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Car } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { drivers } from "@/lib/mock-data";
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+
 
 export default function LoginPage() {
     const router = useRouter();
@@ -18,17 +20,23 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
 
-        // In a real app, this would be an API call to a secure endpoint
-        setTimeout(() => {
-            const driver = drivers.find(d => d.driverLoginId === driverId && d.password === password);
+        try {
+            const q = query(
+                collection(db, "drivers"), 
+                where("driverLoginId", "==", driverId), 
+                where("password", "==", password)
+            );
+            const querySnapshot = await getDocs(q);
 
-            if (driver) {
+            if (!querySnapshot.empty) {
+                const driverDoc = querySnapshot.docs[0];
                 // For this demo, we're using localStorage to persist login state.
-                localStorage.setItem('loggedInDriverId', driver.driverLoginId);
+                // In a real app, use Firebase Auth for proper session management.
+                localStorage.setItem('loggedInDriverId', driverDoc.id);
                 router.push('/dashboard');
             } else {
                 toast({
@@ -38,7 +46,15 @@ export default function LoginPage() {
                 });
                 setIsLoading(false);
             }
-        }, 500); // Simulate network delay
+        } catch (error) {
+            console.error("Login error: ", error);
+             toast({
+                variant: "destructive",
+                title: "Erro de Login",
+                description: "Ocorreu um erro ao tentar fazer login. Verifique a consola.",
+            });
+            setIsLoading(false);
+        }
     };
 
     return (

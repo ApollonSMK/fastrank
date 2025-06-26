@@ -1,11 +1,12 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { drivers, Driver, achievements } from "@/lib/mock-data";
+import { getDriver } from '@/lib/data-service';
+import { Driver, achievements } from '@/lib/data-types';
 import { TrendingUp, Route, ShieldCheck, Fuel, ArrowLeft, Calendar as CalendarIcon, Rocket, Award, Trophy, CalendarDays, Wallet, Star } from "lucide-react";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -39,27 +40,49 @@ const iconMap: { [key: string]: React.ElementType } = {
 function ProfileSkeleton() {
   return (
     <div className="space-y-6 animate-pulse">
-        <div className="flex flex-col items-center space-y-4">
+      <Skeleton className="h-10 w-40" />
+      <div className="flex flex-col items-center space-y-4">
         <Skeleton className="h-24 w-24 rounded-full" />
         <div className="text-center space-y-2">
-            <Skeleton className="h-7 w-40" />
-            <Skeleton className="h-6 w-52" />
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-6 w-52" />
         </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-        {[...Array(4)].map((_, index) => (
-            <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-                <Skeleton className="h-8 w-20" />
-            </CardContent>
-            </Card>
-        ))}
-        </div>
-        <Skeleton className="h-[200px] w-full" />
+      </div>
+       <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-32" />
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+            <div className="flex flex-col items-center gap-2">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <Skeleton className="h-4 w-16" />
+            </div>
+             <div className="flex flex-col items-center gap-2">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <Skeleton className="h-4 w-20" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+      </div>
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-40" />
+        </CardHeader>
+        <CardContent>
+            <Skeleton className="h-[200px] w-full" />
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -67,39 +90,29 @@ function ProfileSkeleton() {
 export default function DriverProfilePage() {
   const router = useRouter();
   const params = useParams();
-  const [driver, setDriver] = useState<Driver | null | undefined>(undefined);
+  const driverId = params.id as string;
+
+  const [driver, setDriver] = useState<Driver | null>(null);
   const [date, setDate] = useState<DateRange | undefined>();
 
-  useEffect(() => {
-    if (params.id) {
-        const driverId = Number(params.id);
-        const foundDriver = drivers.find(d => d.id === driverId);
-        setDriver(foundDriver || null);
+  const fetchDriver = useCallback(async () => {
+    if (driverId) {
+        const foundDriver = await getDriver(driverId);
+        setDriver(foundDriver);
     }
-  }, [params.id]);
+  }, [driverId]);
 
   useEffect(() => {
+    fetchDriver();
     const today = new Date();
     setDate({
       from: addDays(today, -6),
       to: today,
     });
-  }, []);
+  }, [fetchDriver]);
 
-  if (driver === undefined) {
+  if (!driver) {
     return <ProfileSkeleton />;
-  }
-
-  if (driver === null) {
-    return (
-        <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4">Motorista não encontrado</h2>
-            <Button onClick={() => router.back()}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar
-            </Button>
-        </div>
-    );
   }
 
   const { name, rank, trips, safetyScore, efficiency, dailyDeliveries, achievementIds, points, moneyBalance } = driver;
@@ -113,10 +126,7 @@ export default function DriverProfilePage() {
   ];
   
   const chartData = dailyDeliveries
-    .map(d => {
-        const [year, month, day] = d.date.split('-').map(Number);
-        return { ...d, dateObj: new Date(year, month - 1, day) };
-    })
+    .map(d => ({ ...d, dateObj: new Date(d.date) }))
     .filter(d => {
         if (!date?.from) return true;
         const from = date.from;

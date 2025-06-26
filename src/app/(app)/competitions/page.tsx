@@ -1,19 +1,21 @@
 
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { competitions as initialCompetitions, teams, Competition } from '@/lib/mock-data';
+import { getAllCompetitions, getAllTeams } from '@/lib/data-service';
+import { Competition, Team } from '@/lib/data-types';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Swords, Calendar, Users, Trophy, Gift } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
-const CompetitionCard = ({ competition }: { competition: Competition }) => {
+const CompetitionCard = ({ competition, teams }: { competition: Competition, teams: Team[] }) => {
     const getCompetitionStatus = (comp: Competition): { status: 'Ativa' | 'Próxima' | 'Terminada'; color: string } => {
         const now = new Date();
         const start = new Date(comp.startDate);
@@ -29,7 +31,7 @@ const CompetitionCard = ({ competition }: { competition: Competition }) => {
         efficiency: "Eficiência",
     };
 
-    const getParticipantNames = (participants: 'all' | number[]) => {
+    const getParticipantNames = (participants: 'all' | string[]) => {
         if (participants === 'all') {
             return 'Todas as Equipas';
         }
@@ -100,9 +102,50 @@ const CompetitionCard = ({ competition }: { competition: Competition }) => {
     );
 };
 
+const CompetitionSkeleton = () => (
+    <div className="grid gap-6">
+        {[...Array(2)].map((_, i) => (
+             <Card key={i} className="animate-pulse">
+                <CardHeader>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <Skeleton className="h-6 w-48 rounded" />
+                            <Skeleton className="h-4 w-64 mt-2 rounded" />
+                        </div>
+                        <Skeleton className="h-6 w-20 rounded-full" />
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <Skeleton className="h-5 w-40 rounded" />
+                    <Skeleton className="h-5 w-48 rounded" />
+                    <Skeleton className="h-5 w-44 rounded" />
+                    <Skeleton className="h-5 w-52 rounded" />
+                </CardContent>
+                <CardFooter>
+                    <Skeleton className="h-10 w-full rounded-md" />
+                </CardFooter>
+            </Card>
+        ))}
+    </div>
+);
+
 
 export default function CompetitionsPage() {
-    const [competitions] = useState<Competition[]>(initialCompetitions);
+    const [competitions, setCompetitions] = useState<Competition[]>([]);
+    const [teams, setTeams] = useState<Team[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const fetchData = useCallback(async () => {
+        setIsLoading(true);
+        const [compsData, teamsData] = await Promise.all([getAllCompetitions(), getAllTeams()]);
+        setCompetitions(compsData);
+        setTeams(teamsData);
+        setIsLoading(false);
+    }, []);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
     const { onGoing, finished } = useMemo(() => {
         const now = new Date();
@@ -138,9 +181,10 @@ export default function CompetitionsPage() {
                     <TabsTrigger value="history">Histórico</TabsTrigger>
                 </TabsList>
                 <TabsContent value="ongoing" className="mt-6">
-                     {onGoing.length > 0 ? (
+                    {isLoading ? <CompetitionSkeleton /> :
+                     onGoing.length > 0 ? (
                         <div className="grid gap-6">
-                            {onGoing.map(comp => <CompetitionCard key={comp.id} competition={comp} />)}
+                            {onGoing.map(comp => <CompetitionCard key={comp.id} competition={comp} teams={teams} />)}
                         </div>
                     ) : (
                         <Card>
@@ -151,9 +195,10 @@ export default function CompetitionsPage() {
                     )}
                 </TabsContent>
                 <TabsContent value="history" className="mt-6">
-                    {finished.length > 0 ? (
+                    {isLoading ? <CompetitionSkeleton /> :
+                     finished.length > 0 ? (
                         <div className="grid gap-6">
-                            {finished.map(comp => <CompetitionCard key={comp.id} competition={comp} />)}
+                            {finished.map(comp => <CompetitionCard key={comp.id} competition={comp} teams={teams} />)}
                         </div>
                     ) : (
                         <Card>

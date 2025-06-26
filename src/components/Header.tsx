@@ -13,30 +13,37 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { getLoggedInDriver, Driver, Notification } from "@/lib/mock-data"
+import { getLoggedInDriver } from "@/lib/data-service"
+import { Driver, Notification } from "@/lib/data-types"
 import { formatDistanceToNow } from "date-fns";
 import { pt } from 'date-fns/locale';
 
 export default function Header() {
   const router = useRouter();
-  const [driver, setDriver] = useState<Driver | undefined>(undefined);
+  const [driver, setDriver] = useState<Driver | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
-    const loggedInDriver = getLoggedInDriver();
-    if (loggedInDriver) {
-      setDriver(loggedInDriver);
-      setNotifications(loggedInDriver.notifications.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    async function fetchDriver() {
+        const loggedInDriver = await getLoggedInDriver();
+        if (loggedInDriver) {
+          setDriver(loggedInDriver);
+          setNotifications(loggedInDriver.notifications.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        }
     }
+    fetchDriver();
   }, []);
   
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleOpenChange = (open: boolean) => {
     if (open && unreadCount > 0 && driver) {
+      // This part is tricky without a proper backend update.
+      // For now, we'll just update the local state.
+      // A real implementation would call updateDriver().
       setTimeout(() => {
-          driver.notifications.forEach(n => n.read = true);
-          setNotifications([...driver.notifications]);
+          const updatedNotifications = driver.notifications.map(n => ({...n, read: true}));
+          setNotifications(updatedNotifications);
       }, 1500);
     }
   }

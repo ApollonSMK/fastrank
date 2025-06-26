@@ -1,8 +1,10 @@
+
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { teams, drivers as initialDrivers, Driver, DailyDelivery, achievements } from '@/lib/mock-data';
+import { Driver, DailyDelivery, Team, achievements } from '@/lib/data-types';
+import { getTeam, getAllTeams, getDriversByTeam, addDriver, updateDriver, deleteDriver } from '@/lib/data-service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,6 +50,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Skeleton } from '@/components/ui/skeleton';
 
 const FormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
@@ -69,11 +72,13 @@ type DeliveryFormValues = z.infer<typeof deliveryFormSchema>;
 export default function TeamDetailsPage() {
   const router = useRouter();
   const params = useParams();
-  const teamId = Number(params.id);
+  const teamId = params.id as string;
   
-  const team = teams.find(t => t.id === teamId);
-  
-  const [drivers, setDrivers] = useState<Driver[]>(initialDrivers);
+  const [team, setTeam] = useState<Team | null>(null);
+  const [allTeams, setAllTeams] = useState<Team[]>([]);
+  const [teamMembers, setTeamMembers] = useState<Driver[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
@@ -81,6 +86,24 @@ export default function TeamDetailsPage() {
   
   const [isDeliveriesDialogOpen, setIsDeliveriesDialogOpen] = useState(false);
   const [selectedDriverForDeliveries, setSelectedDriverForDeliveries] = useState<Driver | null>(null);
+
+  const fetchData = useCallback(async () => {
+    if (!teamId) return;
+    setIsLoading(true);
+    const [teamData, membersData, allTeamsData] = await Promise.all([
+        getTeam(teamId),
+        getDriversByTeam(teamId),
+        getAllTeams()
+    ]);
+    setTeam(teamData);
+    setTeamMembers(membersData);
+    setAllTeams(allTeamsData);
+    setIsLoading(false);
+  }, [teamId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
@@ -100,28 +123,49 @@ export default function TeamDetailsPage() {
     },
   });
 
+  if (isLoading) {
+      return (
+        <div className="space-y-6">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-8 w-64" />
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-6 w-40" />
+                    <Skeleton className="h-4 w-64 mt-1" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-32" />
+                </CardContent>
+            </Card>
+            <Card>
+                 <CardHeader>
+                    <Skeleton className="h-6 w-40" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-20 w-full" />
+                </CardContent>
+            </Card>
+        </div>
+      );
+  }
+
   if (!team) {
     return <div>Equipa não encontrada</div>;
   }
-  
-  const teamMembers = drivers.filter(d => d.teamId === teamId);
-  const driverForDeliveries = drivers.find(d => d.id === selectedDriverForDeliveries?.id);
 
-
-  const onSubmit: SubmitHandler<FormValues> = (data) => {
-    const newDriverId = drivers.length > 0 ? Math.max(...drivers.map(d => d.id)) + 1 : 1;
-    
-    const newDriver: Driver = {
-      id: newDriverId,
+  const onSubmit: SubmitHandler<FormValues> = async (data) => {
+    const newDriver: Omit<Driver, 'id'> = {
       name: data.name,
       licensePlate: data.licensePlate.toUpperCase(),
       vehicleModel: data.vehicleModel,
       teamId: team.id,
       driverLoginId: data.driverLoginId,
-      password: data.password,
       avatar: '/avatars/default.png',
-      rank: drivers.length + 1,
+      rank: 999, // Rank should be recalculated globally
       points: 0,
+      moneyBalance: 0,
       trips: 0,
       safetyScore: 100,
       efficiency: 100,
@@ -130,10 +174,9 @@ export default function TeamDetailsPage() {
       achievementIds: [],
     };
 
-    const updatedDrivers = [...drivers, newDriver];
-    setDrivers(updatedDrivers);
-    initialDrivers.push(newDriver);
+    await addDriver(newDriver, data.password);
     form.reset();
+    fetchData();
   };
 
   const openDeleteDialog = (driver: Driver) => {
@@ -151,122 +194,103 @@ export default function TeamDetailsPage() {
     setIsDeliveriesDialogOpen(true);
   };
 
-  const handleDeleteDriver = () => {
+  const handleDeleteDriver = async () => {
     if (!selectedDriver) return;
-
-    const updatedDrivers = drivers.filter(d => d.id !== selectedDriver.id);
-    setDrivers(updatedDrivers);
-    
-    const index = initialDrivers.findIndex(d => d.id === selectedDriver.id);
-    if (index > -1) {
-      initialDrivers.splice(index, 1);
-    }
-    
+    await deleteDriver(selectedDriver.id);
     setIsDeleteDialogOpen(false);
     setSelectedDriver(null);
+    fetchData();
   };
   
-  const handleTransferDriver = () => {
+  const handleTransferDriver = async () => {
     if (!selectedDriver || !targetTeamId) return;
-
-    const newTeamId = parseInt(targetTeamId, 10);
-
-    setDrivers(prevDrivers => prevDrivers.map(d => 
-      d.id === selectedDriver.id ? { ...d, teamId: newTeamId } : d
-    ));
-
-    const driverInMock = initialDrivers.find(d => d.id === selectedDriver.id);
-    if (driverInMock) {
-      driverInMock.teamId = newTeamId;
-    }
-
+    await updateDriver(selectedDriver.id, { teamId: targetTeamId });
     setIsTransferDialogOpen(false);
     setSelectedDriver(null);
     setTargetTeamId('');
+    fetchData();
   };
 
-  const handleAddDelivery: SubmitHandler<DeliveryFormValues> = (data) => {
-    if (!driverForDeliveries) return;
+  const handleAddDelivery: SubmitHandler<DeliveryFormValues> = async (data) => {
+    if (!selectedDriverForDeliveries) return;
+
+    const driverToUpdate = teamMembers.find(d => d.id === selectedDriverForDeliveries.id);
+    if (!driverToUpdate) return;
 
     const newDelivery: DailyDelivery = {
       date: format(data.date, 'yyyy-MM-dd'),
       deliveries: data.deliveries,
     };
 
-    const updateDriverDeliveries = (driver: Driver) => {
-        const existingDates = new Set(driver.dailyDeliveries.map(d => d.date));
-        if (existingDates.has(newDelivery.date)) {
-            // In a real app, a toast notification would be better.
-            console.error("A delivery record for this date already exists.");
-            return driver.dailyDeliveries;
-        }
-        const updatedDeliveries = [...driver.dailyDeliveries, newDelivery];
-        return updatedDeliveries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const existingDeliveryIndex = driverToUpdate.dailyDeliveries.findIndex(d => d.date === newDelivery.date);
+    
+    let updatedDeliveries: DailyDelivery[];
+    if (existingDeliveryIndex > -1) {
+      // In a real app, a toast notification would be better.
+      console.error("A delivery record for this date already exists. Not adding.");
+      return;
+    } else {
+      updatedDeliveries = [...driverToUpdate.dailyDeliveries, newDelivery]
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
 
-    const newDriversState = drivers.map(d => 
-      d.id === driverForDeliveries.id 
-        ? { ...d, dailyDeliveries: updateDriverDeliveries(d) }
-        : d
-    );
-    setDrivers(newDriversState);
-    
-    const driverInMock = initialDrivers.find(d => d.id === driverForDeliveries.id);
-    if (driverInMock) {
-      driverInMock.dailyDeliveries = updateDriverDeliveries(driverInMock);
-
-      driverInMock.notifications.unshift({
+    const newNotifications = [...driverToUpdate.notifications];
+    newNotifications.unshift({
         id: Date.now(),
         title: "Entregas Atualizadas",
         description: `Registo de ${data.deliveries} entregas para ${format(data.date, 'dd/MM/yyyy')} foi adicionado por um administrador.`,
         read: false,
         date: new Date().toISOString(),
-      });
+    });
 
-      const totalDeliveries = driverInMock.dailyDeliveries.reduce((sum, d) => sum + d.deliveries, 0);
-
-      if (totalDeliveries >= 150 && !driverInMock.achievementIds.includes('delivery-150')) {
-          driverInMock.achievementIds.push('delivery-150');
-          driverInMock.notifications.unshift({
-              id: Date.now() + 1,
-              title: "Nova Conquista!",
-              description: `Parabéns! Desbloqueou: "${achievements['delivery-150'].name}"`,
-              read: false,
-              date: new Date().toISOString()
-          });
-      } else if (totalDeliveries >= 50 && !driverInMock.achievementIds.includes('delivery-50')) {
-          driverInMock.achievementIds.push('delivery-50');
-          driverInMock.notifications.unshift({
-              id: Date.now() + 1,
-              title: "Nova Conquista!",
-              description: `Parabéns! Desbloqueou: "${achievements['delivery-50'].name}"`,
-              read: false,
-              date: new Date().toISOString()
-          });
-      }
+    const totalDeliveries = updatedDeliveries.reduce((sum, d) => sum + d.deliveries, 0);
+    const newAchievementIds = [...driverToUpdate.achievementIds];
+    
+    if (totalDeliveries >= 150 && !driverToUpdate.achievementIds.includes('delivery-150')) {
+        newAchievementIds.push('delivery-150');
+        newNotifications.unshift({
+            id: Date.now() + 1,
+            title: "Nova Conquista!",
+            description: `Parabéns! Desbloqueou: "${achievements['delivery-150'].name}"`,
+            read: false, date: new Date().toISOString()
+        });
+    } else if (totalDeliveries >= 50 && !driverToUpdate.achievementIds.includes('delivery-50')) {
+        newAchievementIds.push('delivery-50');
+        newNotifications.unshift({
+            id: Date.now() + 1,
+            title: "Nova Conquista!",
+            description: `Parabéns! Desbloqueou: "${achievements['delivery-50'].name}"`,
+            read: false, date: new Date().toISOString()
+        });
     }
     
+    await updateDriver(driverToUpdate.id, { 
+      dailyDeliveries: updatedDeliveries,
+      notifications: newNotifications,
+      achievementIds: newAchievementIds,
+    });
+    
     deliveryForm.reset();
+    fetchData();
+    // Re-fetch driver for the dialog to show updated deliveries
+    const updatedDriver = await getDriver(selectedDriverForDeliveries.id);
+    if (updatedDriver) setSelectedDriverForDeliveries(updatedDriver);
   };
   
-  const handleRemoveDelivery = (dateToRemove: string) => {
-    if (!driverForDeliveries) return;
+  const handleRemoveDelivery = async (dateToRemove: string) => {
+    if (!selectedDriverForDeliveries) return;
+    
+    const driverToUpdate = teamMembers.find(d => d.id === selectedDriverForDeliveries.id);
+    if (!driverToUpdate) return;
+    
+    const updatedDeliveries = driverToUpdate.dailyDeliveries.filter(d => d.date !== dateToRemove);
+    
+    await updateDriver(driverToUpdate.id, { dailyDeliveries: updatedDeliveries });
 
-    const updateDriverDeliveries = (driver: Driver) => {
-        return driver.dailyDeliveries.filter(d => d.date !== dateToRemove);
-    };
-
-    const newDriversState = drivers.map(d => 
-      d.id === driverForDeliveries.id
-        ? { ...d, dailyDeliveries: updateDriverDeliveries(d) }
-        : d
-    );
-    setDrivers(newDriversState);
-
-    const driverInMock = initialDrivers.find(d => d.id === driverForDeliveries.id);
-    if (driverInMock) {
-        driverInMock.dailyDeliveries = updateDriverDeliveries(driverInMock);
-    }
+    fetchData();
+     // Re-fetch driver for the dialog to show updated deliveries
+    const updatedDriver = await getDriver(selectedDriverForDeliveries.id);
+    if (updatedDriver) setSelectedDriverForDeliveries(updatedDriver);
   };
 
 
@@ -454,7 +478,7 @@ export default function TeamDetailsPage() {
                     <SelectValue placeholder="Selecione uma equipa" />
                   </SelectTrigger>
                   <SelectContent>
-                    {teams
+                    {allTeams
                       .filter(t => t.id !== teamId)
                       .map(t => (
                         <SelectItem key={t.id} value={String(t.id)}>
@@ -480,7 +504,7 @@ export default function TeamDetailsPage() {
       }}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Gerir Entregas de {driverForDeliveries?.name}</DialogTitle>
+            <DialogTitle>Gerir Entregas de {selectedDriverForDeliveries?.name}</DialogTitle>
             <DialogDescription>Adicione ou remova registos de entregas diárias.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 py-4">
@@ -522,7 +546,7 @@ export default function TeamDetailsPage() {
                                 selected={field.value}
                                 onSelect={field.onChange}
                                 disabled={(date) =>
-                                  date > new Date() || date < new Date("2000-01-01") || (driverForDeliveries?.dailyDeliveries.some(d => d.date === format(date, 'yyyy-MM-dd')) ?? false)
+                                  date > new Date() || date < new Date("2000-01-01") || (selectedDriverForDeliveries?.dailyDeliveries.some(d => d.date === format(date, 'yyyy-MM-dd')) ?? false)
                                 }
                                 initialFocus
                               />
@@ -555,7 +579,7 @@ export default function TeamDetailsPage() {
                     <CardTitle className="text-lg">Histórico de Entregas</CardTitle>
                 </CardHeader>
                 <CardContent className="max-h-64 overflow-y-auto">
-                    {driverForDeliveries && driverForDeliveries.dailyDeliveries.length > 0 ? (
+                    {selectedDriverForDeliveries && selectedDriverForDeliveries.dailyDeliveries.length > 0 ? (
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -565,7 +589,7 @@ export default function TeamDetailsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {driverForDeliveries.dailyDeliveries.map(delivery => (
+                                {selectedDriverForDeliveries.dailyDeliveries.map(delivery => (
                                     <TableRow key={delivery.date}>
                                         <TableCell>{format(new Date(delivery.date), "dd/MM/yyyy")}</TableCell>
                                         <TableCell>{delivery.deliveries}</TableCell>

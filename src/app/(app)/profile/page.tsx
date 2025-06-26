@@ -5,7 +5,8 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getLoggedInDriver, Driver, achievements } from "@/lib/mock-data";
+import { getLoggedInDriver } from "@/lib/data-service";
+import { Driver, achievements } from "@/lib/data-types";
 import { TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, Rocket, Award, Trophy, CalendarDays, Wallet, Star, LogOut } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
@@ -65,17 +66,23 @@ function ProfileSkeleton() {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [driver, setDriver] = useState<Driver | undefined>(undefined);
+  const [driver, setDriver] = useState<Driver | null>(null);
   const [date, setDate] = useState<DateRange | undefined>();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // We get the logged in driver from the client-side to avoid hydration errors
-    setDriver(getLoggedInDriver());
-    const today = new Date();
-    setDate({
-      from: addDays(today, -6),
-      to: today,
-    });
+    const fetchDriver = async () => {
+        setIsLoading(true);
+        const loggedInDriver = await getLoggedInDriver();
+        setDriver(loggedInDriver);
+        const today = new Date();
+        setDate({
+          from: addDays(today, -6),
+          to: today,
+        });
+        setIsLoading(false);
+    }
+    fetchDriver();
   }, []);
 
   const handleLogout = () => {
@@ -85,7 +92,7 @@ export default function ProfilePage() {
     }
   };
 
-  if (!driver) {
+  if (isLoading || !driver) {
     return <ProfileSkeleton />;
   }
 
@@ -100,10 +107,7 @@ export default function ProfilePage() {
   ];
 
   const chartData = dailyDeliveries
-    .map(d => {
-        const [year, month, day] = d.date.split('-').map(Number);
-        return { ...d, dateObj: new Date(year, month - 1, day) };
-    })
+    .map(d => ({ ...d, dateObj: new Date(d.date) }))
     .filter(d => {
         if (!date?.from) return true;
         const from = date.from;

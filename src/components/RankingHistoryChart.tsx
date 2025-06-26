@@ -1,8 +1,10 @@
+
 "use client"
 
 import * as React from "react"
 import { Line, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
-import { rankingHistory } from "@/lib/mock-data"
+import { getRankingHistory } from "@/lib/data-service"
+import { RankHistory } from "@/lib/data-types"
 import {
   ChartContainer,
   ChartTooltip,
@@ -18,13 +20,20 @@ const chartConfig = {
 }
 
 export default function RankingHistoryChart() {
-  const [isMounted, setIsMounted] = React.useState(false)
+  const [rankingHistory, setRankingHistory] = React.useState<RankHistory[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
-    setIsMounted(true)
+    async function fetchData() {
+        setIsLoading(true);
+        const historyData = await getRankingHistory();
+        setRankingHistory(historyData);
+        setIsLoading(false);
+    }
+    fetchData();
   }, [])
 
-  if (!isMounted) {
+  if (isLoading) {
     return <Skeleton className="h-[250px] w-full" />
   }
 

@@ -1,11 +1,12 @@
 
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { getLoggedInDriver, drivers as allDrivers, challenges as initialChallenges, Challenge, Driver } from '@/lib/mock-data';
+import { getLoggedInDriver, getAllDrivers, addChallenge, updateChallenge, getChallengesForDriver, getDriver, updateDriver } from '@/lib/data-service';
+import { Challenge, Driver, achievements } from '@/lib/data-types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -16,10 +17,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Swords, PlusCircle, Check, X, Crown } from 'lucide-react';
-import { format, formatDistanceToNowStrict, isWithinInterval, parseISO } from 'date-fns';
+import { formatDistanceToNowStrict, isWithinInterval, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const challengeFormSchema = z.object({
   opponentId: z.string().min(1, "É obrigatório selecionar um oponente."),
@@ -37,7 +39,7 @@ const metricLabels = {
   efficiency: "Eficiência",
 };
 
-const ChallengeCard = ({ challenge, currentDriverId, onAction }: { challenge: Challenge, currentDriverId: number, onAction: (challengeId: number, action: 'accept' | 'decline') => void }) => {
+const ChallengeCard = ({ challenge, currentDriverId, allDrivers, onAction }: { challenge: Challenge, currentDriverId: string, allDrivers: Driver[], onAction: (challengeId: string, action: 'accept' | 'decline') => void }) => {
     const challenger = allDrivers.find(d => d.id === challenge.challengerId);
     const opponent = allDrivers.find(d => d.id === challenge.opponentId);
 
@@ -120,33 +122,79 @@ const ChallengeCard = ({ challenge, currentDriverId, onAction }: { challenge: Ch
     )
 }
 
+const ChallengeSkeleton = () => (
+    <div className="space-y-4">
+        {[...Array(2)].map((_, i) => (
+            <Card key={i}>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <Skeleton className="h-6 w-32" />
+                        <Skeleton className="h-6 w-24 rounded-full" />
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-around">
+                        <div className="flex flex-col items-center gap-2">
+                            <Skeleton className="h-16 w-16 rounded-full" />
+                            <Skeleton className="h-5 w-20" />
+                        </div>
+                         <Skeleton className="h-6 w-10" />
+                        <div className="flex flex-col items-center gap-2">
+                            <Skeleton className="h-16 w-16 rounded-full" />
+                            <Skeleton className="h-5 w-20" />
+                        </div>
+                    </div>
+                    <div className="text-center space-y-2">
+                        <Skeleton className="h-5 w-32 mx-auto" />
+                        <Skeleton className="h-4 w-40 mx-auto" />
+                    </div>
+                </CardContent>
+            </Card>
+        ))}
+    </div>
+);
+
 
 export default function ChallengesPage() {
-    const [loggedInDriver, setLoggedInDriver] = useState<Driver | undefined>(undefined);
-    const [challenges, setChallenges] = useState<Challenge[]>(initialChallenges);
+    const [loggedInDriver, setLoggedInDriver] = useState<Driver | null>(null);
+    const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
+    const [challenges, setChallenges] = useState<Challenge[]>([]);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const fetchData = useCallback(async () => {
+        setIsLoading(true);
+        const driver = await getLoggedInDriver();
+        if (driver) {
+            setLoggedInDriver(driver);
+            const [allDriversData, challengesData] = await Promise.all([
+                getAllDrivers(),
+                getChallengesForDriver(driver.id)
+            ]);
+            setAllDrivers(allDriversData);
+            setChallenges(challengesData);
+            await resolveCompletedChallenges(challengesData);
+        }
+        setIsLoading(false);
+    }, []);
 
     useEffect(() => {
-        const driver = getLoggedInDriver();
-        setLoggedInDriver(driver);
-        
-        if (driver) {
-            resolveCompletedChallenges();
-        }
+        fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const resolveCompletedChallenges = () => {
+    const resolveCompletedChallenges = async (currentChallenges: Challenge[]) => {
         const now = new Date();
         let challengesUpdated = false;
 
-        const updatedChallenges = initialChallenges.map(c => {
+        for (const c of currentChallenges) {
             if (c.status === 'active' && parseISO(c.endDate) < now) {
                 challengesUpdated = true;
-                const challenger = allDrivers.find(d => d.id === c.challengerId);
-                const opponent = allDrivers.find(d => d.id === c.opponentId);
 
-                if (!challenger || !opponent) return c; // Skip if drivers not found
+                const challenger = await getDriver(c.challengerId);
+                const opponent = await getDriver(c.opponentId);
+
+                if (!challenger || !opponent) continue;
 
                 const getScore = (driver: Driver) => {
                     const challengeInterval = { start: parseISO(c.startDate), end: parseISO(c.endDate) };
@@ -176,50 +224,65 @@ export default function ChallengesPage() {
                 }
 
                 if (winner && loser) {
+                    const updates = [];
+                    const winnerUpdate: Partial<Driver> = { notifications: [...winner.notifications] };
+                    const loserUpdate: Partial<Driver> = { notifications: [...loser.notifications] };
+
                     if (c.wagerType === 'points') {
-                        winner.points += c.wagerAmount;
-                        loser.points -= c.wagerAmount;
-                    } else { // money
-                        winner.moneyBalance += c.wagerAmount;
-                        loser.moneyBalance -= c.wagerAmount;
+                        winnerUpdate.points = (winner.points || 0) + c.wagerAmount;
+                        loserUpdate.points = (loser.points || 0) - c.wagerAmount;
+                    } else {
+                        winnerUpdate.moneyBalance = (winner.moneyBalance || 0) + c.wagerAmount;
+                        loserUpdate.moneyBalance = (loser.moneyBalance || 0) - c.wagerAmount;
                     }
 
-                    winner.notifications.unshift({
-                        id: Date.now() + winner.id,
-                        title: `Desafio Vencido!`,
+                    winnerUpdate.notifications?.unshift({
+                        id: Date.now() + 1, title: `Desafio Vencido!`,
                         description: `Ganhou o desafio contra ${loser.name} e recebeu ${c.wagerAmount} ${c.wagerType === 'points' ? 'pontos' : '€'}.`,
                         read: false, date: new Date().toISOString(), link: '/challenges'
                     });
-                     loser.notifications.unshift({
-                        id: Date.now() + loser.id,
-                        title: `Desafio Perdido`,
+                     loserUpdate.notifications?.unshift({
+                        id: Date.now() + 2, title: `Desafio Perdido`,
                         description: `Perdeu o desafio contra ${winner.name}.`,
                         read: false, date: new Date().toISOString(), link: '/challenges'
                     });
 
-                    return { ...c, status: 'completed', winnerId: winner.id };
+                    updates.push(updateDriver(winner.id, winnerUpdate));
+                    updates.push(updateDriver(loser.id, loserUpdate));
+                    updates.push(updateChallenge(c.id, { status: 'completed', winnerId: winner.id }));
+                    await Promise.all(updates);
+
                 } else {
-                    // It's a draw
-                    challenger.notifications.unshift({
-                         id: Date.now() + challenger.id,
-                         title: `Desafio Empatado`,
+                    // It's a draw, notify both
+                    const updates = [];
+                    const challengerUpdate = { notifications: [...challenger.notifications] };
+                    const opponentUpdate = { notifications: [...opponent.notifications] };
+
+                    challengerUpdate.notifications.unshift({
+                         id: Date.now() + 1, title: `Desafio Empatado`,
                          description: `O seu desafio contra ${opponent.name} terminou em empate.`,
                          read: false, date: new Date().toISOString(), link: '/challenges'
                     });
-                    opponent.notifications.unshift({
-                         id: Date.now() + opponent.id,
-                         title: `Desafio Empatado`,
+                    opponentUpdate.notifications.unshift({
+                         id: Date.now() + 2, title: `Desafio Empatado`,
                          description: `O seu desafio contra ${challenger.name} terminou em empate.`,
                          read: false, date: new Date().toISOString(), link: '/challenges'
                     });
-                    return { ...c, status: 'completed', winnerId: null };
+                    
+                    updates.push(updateDriver(challenger.id, challengerUpdate));
+                    updates.push(updateDriver(opponent.id, opponentUpdate));
+                    updates.push(updateChallenge(c.id, { status: 'completed', winnerId: null }));
+                    await Promise.all(updates);
                 }
             }
-            return c;
-        });
+        }
 
         if (challengesUpdated) {
-            setChallenges([...updatedChallenges]);
+            // Refetch challenges to update UI
+            if(loggedInDriver) {
+                const challengesData = await getChallengesForDriver(loggedInDriver.id);
+                setChallenges(challengesData);
+            }
         }
     };
 
@@ -232,14 +295,13 @@ export default function ChallengesPage() {
         }
     });
 
-    const onSubmit: SubmitHandler<ChallengeFormValues> = (values) => {
+    const onSubmit: SubmitHandler<ChallengeFormValues> = async (values) => {
         if (!loggedInDriver) return;
 
-        const opponent = allDrivers.find(d => d.id === parseInt(values.opponentId, 10));
+        const opponent = allDrivers.find(d => d.id === values.opponentId);
         if (!opponent) return;
 
-        const newChallenge: Challenge = {
-            id: challenges.length + 1,
+        const newChallenge: Omit<Challenge, 'id'> = {
             challengerId: loggedInDriver.id,
             opponentId: opponent.id,
             metric: values.metric,
@@ -250,48 +312,55 @@ export default function ChallengesPage() {
             status: 'pending',
         };
 
-        initialChallenges.push(newChallenge);
-        setChallenges([...initialChallenges]);
-
-        opponent.notifications.unshift({
-            id: Date.now(),
-            title: "Novo Desafio!",
-            description: `${loggedInDriver.name} desafiou-te!`,
-            read: false,
-            date: new Date().toISOString(),
-            link: '/challenges'
-        });
-
-        form.reset();
-        setIsCreateDialogOpen(false);
-    };
-
-    const handleChallengeAction = (challengeId: number, action: 'accept' | 'decline') => {
-        const challengeIndex = initialChallenges.findIndex(c => c.id === challengeId);
-        if (challengeIndex === -1 || !loggedInDriver) return;
-
-        const challenge = initialChallenges[challengeIndex];
-        const challenger = allDrivers.find(d => d.id === challenge.challengerId);
+        await addChallenge(newChallenge);
         
-        if (!challenger) return;
-        
-        challenge.status = action === 'accept' ? 'active' : 'declined';
-        
-        if(action === 'accept') {
-            challenge.startDate = new Date().toISOString(); // Reset start date on accept
-            challenge.endDate = new Date(new Date().getTime() + (parseISO(challenge.endDate).getTime() - parseISO(challenge.startDate).getTime())).toISOString();
+        const opponentToUpdate = await getDriver(opponent.id);
+        if(opponentToUpdate) {
+            const newNotifications = [...opponentToUpdate.notifications];
+            newNotifications.unshift({
+                id: Date.now(), title: "Novo Desafio!",
+                description: `${loggedInDriver.name} desafiou-te!`,
+                read: false, date: new Date().toISOString(), link: '/challenges'
+            });
+            await updateDriver(opponent.id, { notifications: newNotifications });
         }
         
-        challenger.notifications.unshift({
+        form.reset();
+        setIsCreateDialogOpen(false);
+        fetchData();
+    };
+
+    const handleChallengeAction = async (challengeId: string, action: 'accept' | 'decline') => {
+        if (!loggedInDriver) return;
+
+        const challenge = challenges.find(c => c.id === challengeId);
+        if(!challenge) return;
+        
+        const challenger = await getDriver(challenge.challengerId);
+        if (!challenger) return;
+        
+        const updates: Partial<Challenge> = {
+            status: action === 'accept' ? 'active' : 'declined'
+        };
+
+        if(action === 'accept') {
+            const duration = parseISO(challenge.endDate).getTime() - parseISO(challenge.startDate).getTime();
+            updates.startDate = new Date().toISOString();
+            updates.endDate = new Date(new Date().getTime() + duration).toISOString();
+        }
+        
+        await updateChallenge(challenge.id, updates);
+
+        const newNotifications = [...challenger.notifications];
+        newNotifications.unshift({
             id: Date.now(),
             title: `Desafio ${action === 'accept' ? 'Aceite' : 'Recusado'}`,
             description: `${loggedInDriver.name} ${action === 'accept' ? 'aceitou' : 'recusou'} o teu desafio.`,
-            read: false,
-            date: new Date().toISOString(),
-            link: '/challenges'
+            read: false, date: new Date().toISOString(), link: '/challenges'
         });
+        await updateDriver(challenger.id, { notifications: newNotifications });
 
-        setChallenges([...initialChallenges]);
+        fetchData();
     }
     
     const { pending, active, history } = useMemo(() => {
@@ -314,8 +383,25 @@ export default function ChallengesPage() {
         return { pending, active, history };
     }, [challenges, loggedInDriver]);
 
-    if (!loggedInDriver) {
-        return <div>A carregar...</div>;
+    if (isLoading || !loggedInDriver) {
+        return (
+            <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-10 w-36" />
+                </div>
+                <Tabs defaultValue="pending" className="w-full">
+                     <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="pending">Convites</TabsTrigger>
+                        <TabsTrigger value="active">Ativos</TabsTrigger>
+                        <TabsTrigger value="history">Histórico</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="pending" className="mt-6">
+                        <ChallengeSkeleton />
+                    </TabsContent>
+                </Tabs>
+            </div>
+        );
     }
 
     const availableOpponents = allDrivers.filter(d => d.id !== loggedInDriver.id);
@@ -347,7 +433,7 @@ export default function ChallengesPage() {
                                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                                             <FormControl><SelectTrigger><SelectValue placeholder="Selecione um motorista" /></SelectTrigger></FormControl>
                                             <SelectContent>
-                                                {availableOpponents.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
+                                                {availableOpponents.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                                             </SelectContent>
                                         </Select>
                                         <FormMessage/>
@@ -425,17 +511,17 @@ export default function ChallengesPage() {
                 </TabsList>
                 <TabsContent value="pending" className="mt-6 space-y-4">
                     {pending.length > 0 ? (
-                        pending.map(c => <ChallengeCard key={c.id} challenge={c} currentDriverId={loggedInDriver.id} onAction={handleChallengeAction}/>)
+                        pending.map(c => <ChallengeCard key={c.id} challenge={c} currentDriverId={loggedInDriver.id} allDrivers={allDrivers} onAction={handleChallengeAction}/>)
                     ) : <p className="text-center text-muted-foreground pt-4">Não tem convites pendentes.</p>}
                 </TabsContent>
                 <TabsContent value="active" className="mt-6 space-y-4">
                     {active.length > 0 ? (
-                         active.map(c => <ChallengeCard key={c.id} challenge={c} currentDriverId={loggedInDriver.id} onAction={handleChallengeAction}/>)
+                         active.map(c => <ChallengeCard key={c.id} challenge={c} currentDriverId={loggedInDriver.id} allDrivers={allDrivers} onAction={handleChallengeAction}/>)
                     ) : <p className="text-center text-muted-foreground pt-4">Não tem desafios ativos.</p>}
                 </TabsContent>
                 <TabsContent value="history" className="mt-6 space-y-4">
                     {history.length > 0 ? (
-                        history.map(c => <ChallengeCard key={c.id} challenge={c} currentDriverId={loggedInDriver.id} onAction={handleChallengeAction}/>)
+                        history.map(c => <ChallengeCard key={c.id} challenge={c} currentDriverId={loggedInDriver.id} allDrivers={allDrivers} onAction={handleChallengeAction}/>)
                     ) : <p className="text-center text-muted-foreground pt-4">Ainda não completou nenhum desafio.</p>}
                 </TabsContent>
             </Tabs>

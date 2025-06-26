@@ -1,14 +1,15 @@
 
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { competitions as initialCompetitions, drivers as initialDrivers, teams } from '@/lib/mock-data';
+import { getCompetition, getAllDrivers, getAllTeams } from '@/lib/data-service';
+import { Competition, Driver, Team } from '@/lib/data-types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ArrowLeft, Trophy, Award, Medal, ShieldCheck, Fuel, TrendingUp, Gift } from 'lucide-react';
-import { isWithinInterval, parseISO } from 'date-fns';
+import { isWithinInterval, parseISO, startOfDay } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const metricInfo = {
@@ -45,29 +46,50 @@ const LeaderboardSkeleton = () => (
 export default function CompetitionLeaderboardPage() {
     const router = useRouter();
     const params = useParams();
-    const competitionId = Number(params.id);
+    const competitionId = params.id as string;
 
-    const competition = useMemo(() => initialCompetitions.find(c => c.id === competitionId), [competitionId]);
+    const [competition, setCompetition] = useState<Competition | null>(null);
+    const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
+    const [teams, setTeams] = useState<Team[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const fetchData = useCallback(async () => {
+        if (!competitionId) return;
+        setIsLoading(true);
+        const [compData, driversData, teamsData] = await Promise.all([
+            getCompetition(competitionId),
+            getAllDrivers(),
+            getAllTeams()
+        ]);
+        setCompetition(compData);
+        setAllDrivers(driversData);
+        setTeams(teamsData);
+        setIsLoading(false);
+    }, [competitionId]);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
     const rankedDrivers = useMemo(() => {
         if (!competition) return [];
 
         const participatingDrivers = competition.participants === 'all'
-            ? initialDrivers
-            : initialDrivers.filter(driver => driver.teamId && competition.participants.includes(driver.teamId));
+            ? allDrivers
+            : allDrivers.filter(driver => driver.teamId && competition.participants.includes(driver.teamId));
 
         const driversWithScores = participatingDrivers.map(driver => {
             let score = 0;
             const competitionInterval = {
-                start: parseISO(competition.startDate),
-                end: parseISO(competition.endDate)
+                start: startOfDay(parseISO(competition.startDate)),
+                end: startOfDay(parseISO(competition.endDate))
             };
 
             switch (competition.metric) {
                 case 'deliveries':
                     score = driver.dailyDeliveries
                         .filter(d => {
-                            const deliveryDate = parseISO(d.date + 'T00:00:00');
+                            const deliveryDate = startOfDay(parseISO(d.date));
                             return isWithinInterval(deliveryDate, competitionInterval);
                         })
                         .reduce((sum, delivery) => sum + delivery.deliveries, 0);
@@ -84,8 +106,24 @@ export default function CompetitionLeaderboardPage() {
 
         return driversWithScores.sort((a, b) => b.score - a.score);
 
-    }, [competition]);
+    }, [competition, allDrivers]);
     
+    if (isLoading) {
+        return (
+            <div className="space-y-6">
+                <Skeleton className="h-10 w-48 mb-2" />
+                <Card>
+                    <CardHeader>
+                        <Skeleton className="h-8 w-64" />
+                        <Skeleton className="h-5 w-52 mt-2" />
+                        <Skeleton className="h-5 w-60 mt-1" />
+                    </CardHeader>
+                </Card>
+                <LeaderboardSkeleton />
+            </div>
+        );
+    }
+
     if (!competition) {
         return (
              <div className="space-y-4">
@@ -157,8 +195,7 @@ export default function CompetitionLeaderboardPage() {
                             </Card>
                         )
                     })
-                ) : <LeaderboardSkeleton /> }
-                 {rankedDrivers.length === 0 && (
+                ) : (
                      <Card>
                         <CardContent className="p-10 text-center">
                             <p className="text-muted-foreground">Ainda não há dados para este leaderboard.</p>
