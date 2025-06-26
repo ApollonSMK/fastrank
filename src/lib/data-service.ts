@@ -31,8 +31,12 @@ export async function updateDriver(id: string, data: Partial<Driver>) {
     await updateDoc(doc(db, 'drivers', id), data);
 }
 
-export async function addDriver(driverData: Omit<Driver, 'id'>) {
-    return await addDoc(collection(db, 'drivers'), driverData);
+export async function addDriver(driverData: Omit<Driver, 'id'>, password: string) {
+    const fullDriverData = {
+        ...driverData,
+        password: password,
+    };
+    return await addDoc(collection(db, 'drivers'), fullDriverData);
 }
 
 export async function deleteDriver(id: string) {

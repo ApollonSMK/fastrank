@@ -104,9 +104,6 @@ export default function LoginPage() {
                 </Card>
                 <div className="mt-4 space-y-2 text-center text-xs text-muted-foreground">
                     <p>
-                        Use <code className="font-semibold text-foreground">ana.silva</code> / <code className="font-semibold text-foreground">password123</code> para testar.
-                    </p>
-                    <p>
                         Empresa de Frotas &copy; {new Date().getFullYear()}
                     </p>
                 </div>
