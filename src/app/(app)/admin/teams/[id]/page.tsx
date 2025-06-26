@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Driver, DailyDelivery, Team, achievements } from '@/lib/data-types';
-import { getTeam, getAllTeams, getDriversByTeam, addDriver, updateDriver, deleteDriver } from '@/lib/data-service';
+import { getTeam, getAllTeams, getDriversByTeam, addDriver, updateDriver, deleteDriver, getDriver } from '@/lib/data-service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
