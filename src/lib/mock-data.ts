@@ -20,6 +20,20 @@ export type Notification = {
   description: string;
   read: boolean;
   date: string;
+  link?: string;
+};
+
+export type Challenge = {
+  id: number;
+  challengerId: number;
+  opponentId: number;
+  metric: 'deliveries' | 'safety' | 'efficiency';
+  wagerType: 'points' | 'money';
+  wagerAmount: number;
+  startDate: string; // ISO
+  endDate: string; // ISO
+  status: 'pending' | 'active' | 'declined' | 'completed';
+  winnerId?: number | null;
 };
 
 export type Driver = {
@@ -82,7 +96,8 @@ export const drivers: Driver[] = [
   { id: 3, name: "Carlos Souza", avatar: "/avatars/03.png", rank: 3, points: 150, moneyBalance: 0, trips: 150, safetyScore: 99, efficiency: 92, teamId: 2, licensePlate: "EE-33-FF", vehicleModel: "Fiat 500", driverLoginId: "carlos.souza", password: "password123", dailyDeliveries: [ { date: d(6), deliveries: 18 }, { date: d(5), deliveries: 22 }, { date: d(4), deliveries: 25 }, { date: d(3), deliveries: 27 }, { date: d(2), deliveries: 29 }, { date: d(1), deliveries: 29 } ], achievementIds: ['delivery-150', 'safety-champ', 'top-3'], notifications: [] },
   { id: 4, name: "Daniela Lima", avatar: "/avatars/04.png", rank: 4, points: 148, moneyBalance: 0, trips: 148, safetyScore: 95, efficiency: 96, teamId: 3, licensePlate: "GG-44-HH", vehicleModel: "VW Polo", driverLoginId: "daniela.lima", password: "password123", dailyDeliveries: [ { date: d(6), deliveries: 25 }, { date: d(5), deliveries: 21 }, { date: d(4), deliveries: 23 }, { date: d(3), deliveries: 26 }, { date: d(2), deliveries: 25 }, { date: d(1), deliveries: 28 } ], achievementIds: ['delivery-50', 'consistent-performer'], notifications: [
       { id: 1, title: 'Bem-vinda, Daniela!', description: 'O seu relatório semanal está pronto.', read: true, date: '2024-06-24T10:00:00Z' },
-      { id: 2, title: 'Nova Conquista!', description: 'Parabéns, alcançou "Desempenho Consistente"!', read: false, date: '2024-06-25T09:00:00Z' }
+      { id: 2, title: 'Nova Conquista!', description: 'Parabéns, alcançou "Desempenho Consistente"!', read: false, date: '2024-06-25T09:00:00Z' },
+      { id: 4, title: 'Novo Desafio!', description: 'Ana Silva desafiou-te para uma competição de entregas!', read: false, date: new Date().toISOString(), link: '/challenges' }
   ] },
   { id: 5, name: "Eduardo Rocha", avatar: "/avatars/05.png", rank: 5, points: 142, moneyBalance: 0, trips: 142, safetyScore: 96, efficiency: 93, teamId: 3, licensePlate: "II-55-JJ", vehicleModel: "Seat Ibiza", driverLoginId: "eduardo.rocha", password: "password123", dailyDeliveries: [ { date: d(6), deliveries: 21 }, { date: d(5), deliveries: 20 }, { date: d(4), deliveries: 24 }, { date: d(3), deliveries: 25 }, { date: d(2), deliveries: 26 }, { date: d(1), deliveries: 26 } ], achievementIds: ['delivery-50'], notifications: [] },
   { id: 6, name: "Fernanda Dias", avatar: "/avatars/06.png", rank: 6, points: 139, moneyBalance: 0, trips: 139, safetyScore: 94, efficiency: 91, teamId: 4, licensePlate: "KK-66-LL", vehicleModel: "Toyota Yaris", driverLoginId: "fernanda.dias", password: "password123", dailyDeliveries: [ { date: d(6), deliveries: 19 }, { date: d(5), deliveries: 18 }, { date: d(4), deliveries: 22 }, { date: d(3), deliveries: 24 }, { date: d(2), deliveries: 27 }, { date: d(1), deliveries: 29 } ], achievementIds: ['delivery-50'], notifications: [] },
@@ -132,6 +147,20 @@ export const competitions: Competition[] = [
         endDate: '2024-05-31T23:59:59Z',
         rewardType: 'money',
         rewardAmount: 50,
+    }
+];
+
+export const challenges: Challenge[] = [
+    {
+        id: 1,
+        challengerId: 1,
+        opponentId: 4, 
+        metric: 'deliveries',
+        wagerType: 'points',
+        wagerAmount: 50,
+        startDate: new Date().toISOString(),
+        endDate: new Date(new Date().getTime() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'pending',
     }
 ];
 

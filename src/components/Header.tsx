@@ -1,6 +1,8 @@
+
 "use client"
 
 import { useEffect, useState } from "react";
+import { useRouter } from 'next/navigation';
 import { Bell, Car } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,6 +18,7 @@ import { formatDistanceToNow } from "date-fns";
 import { pt } from 'date-fns/locale';
 
 export default function Header() {
+  const router = useRouter();
   const [driver, setDriver] = useState<Driver | undefined>(undefined);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
@@ -31,11 +34,16 @@ export default function Header() {
 
   const handleOpenChange = (open: boolean) => {
     if (open && unreadCount > 0 && driver) {
-      // Mark all as read after a short delay to allow the user to see them
       setTimeout(() => {
           driver.notifications.forEach(n => n.read = true);
           setNotifications([...driver.notifications]);
       }, 1500);
+    }
+  }
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (notification.link) {
+      router.push(notification.link);
     }
   }
 
@@ -64,7 +72,11 @@ export default function Header() {
           <DropdownMenuSeparator />
           {notifications.length > 0 ? (
             notifications.map((notification) => (
-              <DropdownMenuItem key={notification.id} className={`flex flex-col items-start gap-1 whitespace-normal ${!notification.read ? 'bg-primary/10' : ''}`}>
+              <DropdownMenuItem 
+                key={notification.id} 
+                className={`flex flex-col items-start gap-1 whitespace-normal ${!notification.read ? 'bg-primary/10' : ''} ${notification.link ? 'cursor-pointer' : ''}`}
+                onClick={() => handleNotificationClick(notification)}
+                >
                 <p className="font-semibold">{notification.title}</p>
                 <p className="text-xs text-muted-foreground">{notification.description}</p>
                 <p className="text-xs text-muted-foreground/80 self-end">{formatDistanceToNow(new Date(notification.date), { addSuffix: true, locale: pt })}</p>
