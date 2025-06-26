@@ -2,14 +2,15 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
+// TODO: For a production application, move this configuration to environment variables.
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+  apiKey: "AIzaSyDt6uEYbYk0VZE7CY_kMIgW3H3daxp7F18",
+  authDomain: "fastrack-f6f0a.firebaseapp.com",
+  projectId: "fastrack-f6f0a",
+  storageBucket: "fastrack-f6f0a.appspot.com",
+  messagingSenderId: "282991338208",
+  appId: "1:282991338208:web:f7ed985f99ca70068a2685",
+  measurementId: "G-CB6MZYQCM8"
 };
 
 // Initialize Firebase
