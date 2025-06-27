@@ -146,7 +146,7 @@ const DriversManagement = () => {
             name: driver.name,
             licensePlate: driver.licensePlate,
             vehicleModel: driver.vehicleModel,
-            teamId: driver.teamId,
+            teamId: driver.teamId || 'none',
         });
         setIsEditDialogOpen(true);
     };
@@ -185,10 +185,11 @@ const DriversManagement = () => {
         const currentDriver = await getDriver(driverToEdit.id);
         if (!currentDriver) return;
 
+        const newTeamId = data.teamId === 'none' ? '' : data.teamId;
         const nameChanged = currentDriver.name !== data.name;
         const plateChanged = currentDriver.licensePlate.toUpperCase() !== data.licensePlate.toUpperCase();
         const modelChanged = currentDriver.vehicleModel !== data.vehicleModel;
-        const teamChanged = currentDriver.teamId !== data.teamId;
+        const teamChanged = currentDriver.teamId !== newTeamId;
 
         if (!nameChanged && !plateChanged && !modelChanged && !teamChanged) {
             setIsEditDialogOpen(false);
@@ -200,7 +201,7 @@ const DriversManagement = () => {
             name: data.name,
             licensePlate: data.licensePlate.toUpperCase(),
             vehicleModel: data.vehicleModel,
-            teamId: data.teamId || '',
+            teamId: newTeamId,
         };
         
         const changeDescriptions: string[] = [];
@@ -227,7 +228,7 @@ const DriversManagement = () => {
         if (modelChanged) changeDescriptions.push(`Modelo do veículo alterado de "${currentDriver.vehicleModel}" para "${data.vehicleModel}".`);
         if(teamChanged) {
             const currentTeamName = teams.find(t => t.id === currentDriver.teamId)?.name || 'Sem Equipa';
-            const newTeamName = teams.find(t => t.id === data.teamId)?.name || 'Sem Equipa';
+            const newTeamName = teams.find(t => t.id === newTeamId)?.name || 'Sem Equipa';
             changeDescriptions.push(`Equipa alterada de "${currentTeamName}" para "${newTeamName}".`);
         }
 
@@ -358,7 +359,7 @@ const DriversManagement = () => {
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Selecione a equipa" /></SelectTrigger></FormControl>
                                     <SelectContent>
-                                        <SelectItem value="">Sem Equipa</SelectItem>
+                                        <SelectItem value="none">Sem Equipa</SelectItem>
                                         {teams.map(team => <SelectItem key={team.id} value={String(team.id)}>{team.name}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
