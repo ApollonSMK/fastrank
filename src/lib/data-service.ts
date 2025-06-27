@@ -75,9 +75,10 @@ export async function getDriver(id: string): Promise<Driver | null> {
 }
 
 export async function getDriversByTeam(teamId: string): Promise<Driver[]> {
-    const q = query(collection(db, 'drivers'), where('teamId', '==', teamId), where('name', '!=', '[VEÍCULO LIVRE]'));
+    const q = query(collection(db, 'drivers'), where('teamId', '==', teamId));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => docToObject<Driver>(d));
+    // Filter out free vehicles on the client side to avoid complex composite index
+    return snapshot.docs.map(d => docToObject<Driver>(d)).filter(d => d.name !== '[VEÍCULO LIVRE]');
 }
 
 export async function updateDriver(id: string, data: Partial<Driver>) {
