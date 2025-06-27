@@ -422,6 +422,10 @@ const VehiclesManagement = () => {
 
   const addVehicleForm = useForm<AddVehicleFormValues>({
     resolver: zodResolver(addVehicleFormSchema),
+    defaultValues: {
+        licensePlate: '',
+        vehicleModel: '',
+    },
   });
 
   const onAddVehicleSubmit: SubmitHandler<AddVehicleFormValues> = async (data) => {
