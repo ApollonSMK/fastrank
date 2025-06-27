@@ -54,7 +54,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const FormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
-  licensePlate: z.string().regex(/^[A-Z]{2}-\d{2}-[A-Z]{2}$/, { message: 'Formato de matrícula inválido (ex: AA-11-BB).' }),
+  licensePlate: z.string().min(1, { message: "A matrícula é obrigatória." }),
   vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
   email: z.string().email({ message: 'Por favor, insira um email válido.' }),
   password: z.string().min(6, { message: 'A senha deve ter pelo menos 6 caracteres.' }),
@@ -337,7 +337,7 @@ export default function TeamDetailsPage() {
                     <FormItem>
                       <FormLabel>Matrícula</FormLabel>
                       <FormControl>
-                        <Input placeholder="AA-11-BB" {...field} />
+                        <Input placeholder="Ex: LU 12345" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
