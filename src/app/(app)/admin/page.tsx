@@ -248,6 +248,7 @@ const CompetitionsManagement = () => {
       description: values.description || "",
       metric: values.metric,
       participants: values.teamId === 'all' ? 'all' : [values.teamId],
+      enrolledDriverIds: [],
       startDate: values.dateRange.from.toISOString(),
       endDate: values.dateRange.to.toISOString(),
       rewardType: values.rewardType,
@@ -490,3 +491,5 @@ export default function AdminPage() {
     </>
   );
 }
+
+    

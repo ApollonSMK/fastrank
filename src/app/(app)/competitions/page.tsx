@@ -6,16 +6,17 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { getAllCompetitions, getAllTeams } from '@/lib/data-service';
-import { Competition, Team } from '@/lib/data-types';
+import { getAllCompetitions, getAllTeams, getLoggedInDriver, enrollInCompetition } from '@/lib/data-service';
+import { Competition, Team, Driver } from '@/lib/data-types';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Swords, Calendar, Users, Trophy, Gift } from 'lucide-react';
+import { Swords, Calendar, Users, Trophy, Gift, PlusCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from "@/hooks/use-toast";
 
 
-const CompetitionCard = ({ competition, teams }: { competition: Competition, teams: Team[] }) => {
+const CompetitionCard = ({ competition, teams, loggedInDriver, onEnroll }: { competition: Competition, teams: Team[], loggedInDriver: Driver | null, onEnroll: () => void }) => {
     const getCompetitionStatus = (comp: Competition): { status: 'Ativa' | 'Próxima' | 'Terminada'; color: string } => {
         const now = new Date();
         const start = new Date(comp.startDate);
@@ -43,6 +44,9 @@ const CompetitionCard = ({ competition, teams }: { competition: Competition, tea
     const rewardLabel = competition.rewardType === 'money'
         ? `€${competition.rewardAmount.toFixed(2)}`
         : `${competition.rewardAmount} Pontos`;
+
+    const isEnrollmentOpen = new Date() < new Date(competition.startDate);
+    const isEnrolled = loggedInDriver ? competition.enrolledDriverIds?.includes(loggedInDriver.id) : false;
 
     return (
         <Card className="border-primary/20 shadow-lg shadow-primary/10 hover:border-primary/50 transition-all">
@@ -76,7 +80,7 @@ const CompetitionCard = ({ competition, teams }: { competition: Competition, tea
                  <div className="flex items-center gap-4 text-sm">
                     <div className="flex items-center gap-2 text-muted-foreground">
                         <Users className="h-4 w-4 text-primary" />
-                        <span className="font-semibold">Participantes:</span>
+                        <span className="font-semibold">Equipas Elegíveis:</span>
                     </div>
                     <span>{getParticipantNames(competition.participants)}</span>
                 </div>
@@ -91,12 +95,23 @@ const CompetitionCard = ({ competition, teams }: { competition: Competition, tea
                 </div>
             </CardContent>
             <CardFooter>
-                 <Link href={`/competitions/${competition.id}`} className={`w-full ${status === 'Próxima' ? 'pointer-events-none' : ''}`}>
-                    <Button className="w-full" disabled={status === 'Próxima'}>
-                        <Trophy className="mr-2 h-4 w-4" />
-                        Ver Leaderboard
+                 {isEnrolled ? (
+                    <Link href={`/competitions/${competition.id}`} className="w-full">
+                        <Button className="w-full">
+                            <Trophy className="mr-2 h-4 w-4" />
+                            Ver Leaderboard
+                        </Button>
+                    </Link>
+                ) : isEnrollmentOpen ? (
+                    <Button className="w-full" onClick={onEnroll}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Inscrever-se
                     </Button>
-                </Link>
+                ) : (
+                    <Button className="w-full" disabled>
+                        {status === 'Ativa' ? 'Inscrições Encerradas' : 'Competição Terminada'}
+                    </Button>
+                )}
             </CardFooter>
         </Card>
     );
@@ -133,13 +148,20 @@ const CompetitionSkeleton = () => (
 export default function CompetitionsPage() {
     const [competitions, setCompetitions] = useState<Competition[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
+    const [loggedInDriver, setLoggedInDriver] = useState<Driver | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const { toast } = useToast();
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
-        const [compsData, teamsData] = await Promise.all([getAllCompetitions(), getAllTeams()]);
+        const [compsData, teamsData, driverData] = await Promise.all([
+            getAllCompetitions(), 
+            getAllTeams(),
+            getLoggedInDriver()
+        ]);
         setCompetitions(compsData);
         setTeams(teamsData);
+        setLoggedInDriver(driverData);
         setIsLoading(false);
     }, []);
 
@@ -147,12 +169,39 @@ export default function CompetitionsPage() {
         fetchData();
     }, [fetchData]);
 
+    const handleEnroll = async (competitionId: string, competitionName: string) => {
+        if (!loggedInDriver) return;
+        try {
+            await enrollInCompetition(competitionId, loggedInDriver.id);
+            toast({
+                title: "Inscrição com Sucesso!",
+                description: `Está agora inscrito na competição "${competitionName}". Boa sorte!`,
+            });
+            fetchData();
+        } catch (error) {
+            toast({
+                variant: "destructive",
+                title: "Erro na Inscrição",
+                description: "Não foi possível concluir a sua inscrição. Tente novamente.",
+            });
+            console.error("Enrollment failed:", error);
+        }
+    };
+
     const { onGoing, finished } = useMemo(() => {
+        if (!loggedInDriver) return { onGoing: [], finished: [] };
+
+        const eligibleCompetitions = competitions.filter(comp => {
+            if (comp.participants === 'all') return true;
+            if (loggedInDriver.teamId && comp.participants.includes(loggedInDriver.teamId)) return true;
+            return false;
+        });
+        
         const now = new Date();
         const onGoingComps: Competition[] = [];
         const finishedComps: Competition[] = [];
 
-        competitions.forEach(comp => {
+        eligibleCompetitions.forEach(comp => {
             const end = new Date(comp.endDate);
             if (now > end) {
                 finishedComps.push(comp);
@@ -165,7 +214,7 @@ export default function CompetitionsPage() {
         finishedComps.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
 
         return { onGoing: onGoingComps, finished: finishedComps };
-    }, [competitions]);
+    }, [competitions, loggedInDriver]);
 
 
     return (
@@ -177,14 +226,22 @@ export default function CompetitionsPage() {
             
             <Tabs defaultValue="ongoing" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="ongoing">Em Andamento</TabsTrigger>
+                    <TabsTrigger value="ongoing">Em Andamento & Futuras</TabsTrigger>
                     <TabsTrigger value="history">Histórico</TabsTrigger>
                 </TabsList>
                 <TabsContent value="ongoing" className="mt-6">
                     {isLoading ? <CompetitionSkeleton /> :
                      onGoing.length > 0 ? (
                         <div className="grid gap-6">
-                            {onGoing.map(comp => <CompetitionCard key={comp.id} competition={comp} teams={teams} />)}
+                            {onGoing.map(comp => 
+                                <CompetitionCard 
+                                    key={comp.id} 
+                                    competition={comp} 
+                                    teams={teams} 
+                                    loggedInDriver={loggedInDriver}
+                                    onEnroll={() => handleEnroll(comp.id, comp.name)}
+                                />
+                            )}
                         </div>
                     ) : (
                         <Card>
@@ -198,7 +255,15 @@ export default function CompetitionsPage() {
                     {isLoading ? <CompetitionSkeleton /> :
                      finished.length > 0 ? (
                         <div className="grid gap-6">
-                            {finished.map(comp => <CompetitionCard key={comp.id} competition={comp} teams={teams} />)}
+                             {finished.map(comp => 
+                                <CompetitionCard 
+                                    key={comp.id} 
+                                    competition={comp} 
+                                    teams={teams} 
+                                    loggedInDriver={loggedInDriver}
+                                    onEnroll={() => handleEnroll(comp.id, comp.name)}
+                                />
+                            )}
                         </div>
                     ) : (
                         <Card>
@@ -212,3 +277,5 @@ export default function CompetitionsPage() {
         </div>
     );
 }
+
+    

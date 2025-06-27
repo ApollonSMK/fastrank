@@ -72,7 +72,8 @@ export type Competition = {
   name: string;
   description: string;
   metric: 'deliveries' | 'safety' | 'efficiency';
-  participants: 'all' | string[]; // 'all' or array of team IDs
+  participants: 'all' | string[]; // 'all' or array of team IDs that are ALLOWED to enroll
+  enrolledDriverIds?: string[]; // array of driver IDs that HAVE enrolled
   startDate: string; // ISO string
   endDate: string; // ISO string
   rewardType: 'points' | 'money';
@@ -88,3 +89,5 @@ export const achievements: Achievements = {
   'consistent-performer': { name: 'Desempenho Consistente', description: 'Registe entregas por 5 dias seguidos.', icon: 'CalendarDays' },
   'money-winner': { name: 'Prémio Monetário', description: 'Ganhe uma competição com prémio em dinheiro.', icon: 'Landmark' },
 };
+
+    

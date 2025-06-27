@@ -72,11 +72,11 @@ export default function CompetitionLeaderboardPage() {
     }, [fetchData]);
 
     const rankedDrivers = useMemo(() => {
-        if (!competition) return [];
+        if (!competition || !competition.enrolledDriverIds) return [];
 
-        const participatingDrivers = competition.participants === 'all'
-            ? allDrivers
-            : allDrivers.filter(driver => driver.teamId && competition.participants.includes(driver.teamId));
+        const participatingDrivers = allDrivers.filter(driver =>
+            competition.enrolledDriverIds?.includes(driver.id)
+        );
 
         const driversWithScores = participatingDrivers.map(driver => {
             let score = 0;
@@ -206,3 +206,5 @@ export default function CompetitionLeaderboardPage() {
         </div>
     );
 }
+
+    

@@ -1,6 +1,6 @@
 
 import { db, auth, authInitialized } from './firebase';
-import { collection, getDocs, doc, getDoc, setDoc, query, where, addDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, query, where, addDoc, updateDoc, deleteDoc, Timestamp, arrayUnion } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import type { Driver, Team, Competition, Challenge, RankHistory } from './data-types';
 
@@ -127,6 +127,13 @@ export async function addCompetition(compData: Omit<Competition, 'id'>) {
     return await addDoc(collection(db, 'competitions'), dataWithTimestamps);
 }
 
+export async function enrollInCompetition(competitionId: string, driverId: string) {
+    const competitionRef = doc(db, 'competitions', competitionId);
+    await updateDoc(competitionRef, {
+        enrolledDriverIds: arrayUnion(driverId)
+    });
+}
+
 
 // --- Challenge Functions ---
 export async function getChallengesForDriver(driverId: string): Promise<Challenge[]> {
@@ -169,7 +176,8 @@ export async function getRankingHistory(): Promise<RankHistory[]> {
 
 // --- Logged In User ---
 export async function getLoggedInDriver(): Promise<Driver | null> {
-    const user = await authInitialized;
+    await authInitialized;
+    const user = auth.currentUser;
     if (user) {
         try {
             const driver = await getDriver(user.uid);
@@ -181,3 +189,5 @@ export async function getLoggedInDriver(): Promise<Driver | null> {
     }
     return null;
 }
+
+    
