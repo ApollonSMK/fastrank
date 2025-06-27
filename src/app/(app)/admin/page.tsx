@@ -21,8 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Team, Competition, Driver, FleetChangeLog } from "@/lib/data-types";
-import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition, getFleetChangeLog } from "@/lib/data-service";
-import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart, Trash2, Car, FileDown } from "lucide-react";
+import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition, getFleetChangeLog, updateDriver, getDriver, deleteDriver, addFleetChangeLog } from "@/lib/data-service";
+import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart, Trash2, Car, FileDown, Contact, History, Edit } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,6 +78,14 @@ const competitionFormSchema = z.object({
   rewardAmount: z.coerce.number().min(1, { message: "O valor do prémio deve ser positivo."}),
 });
 
+const editDriverFormSchema = z.object({
+  name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
+  licensePlate: z.string().min(1, { message: "A matrícula é obrigatória." }),
+  vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
+  teamId: z.string().optional(),
+});
+type EditDriverFormValues = z.infer<typeof editDriverFormSchema>;
+
 const StatisticsManagement = () => {
   return (
     <Card>
@@ -91,6 +99,271 @@ const StatisticsManagement = () => {
     </Card>
   );
 };
+
+const DriversManagement = () => {
+    const router = useRouter();
+    const [drivers, setDrivers] = useState<Driver[]>([]);
+    const [teams, setTeams] = useState<Team[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const [driverToEdit, setDriverToEdit] = useState<Driver | null>(null);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+    const fetchData = useCallback(async () => {
+        setIsLoading(true);
+        const [driversData, teamsData] = await Promise.all([
+            getAllDrivers(),
+            getAllTeams(),
+        ]);
+        setDrivers(driversData.sort((a,b) => a.name.localeCompare(b.name)));
+        setTeams(teamsData);
+        setIsLoading(false);
+    }, []);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
+    const editForm = useForm<EditDriverFormValues>({
+        resolver: zodResolver(editDriverFormSchema),
+    });
+
+    const openEditDialog = (driver: Driver) => {
+        setDriverToEdit(driver);
+        editForm.reset({
+            name: driver.name,
+            licensePlate: driver.licensePlate,
+            vehicleModel: driver.vehicleModel,
+            teamId: driver.teamId,
+        });
+        setIsEditDialogOpen(true);
+    };
+    
+    const openDeleteDialog = (driver: Driver) => {
+        setDriverToDelete(driver);
+        setIsDeleteDialogOpen(true);
+    };
+
+    const handleDeleteDriver = async () => {
+        if (!driverToDelete) return;
+        await deleteDriver(driverToDelete.id);
+        setIsDeleteDialogOpen(false);
+        setDriverToDelete(null);
+        fetchData();
+    };
+    
+    const onUpdateSubmit: SubmitHandler<EditDriverFormValues> = async (data) => {
+        if (!driverToEdit) return;
+
+        const currentDriver = await getDriver(driverToEdit.id);
+        if (!currentDriver) return;
+
+        const nameChanged = currentDriver.name !== data.name;
+        const plateChanged = currentDriver.licensePlate.toUpperCase() !== data.licensePlate.toUpperCase();
+        const modelChanged = currentDriver.vehicleModel !== data.vehicleModel;
+        const teamChanged = currentDriver.teamId !== data.teamId;
+
+        if (!nameChanged && !plateChanged && !modelChanged && !teamChanged) {
+            setIsEditDialogOpen(false);
+            setDriverToEdit(null);
+            return;
+        }
+
+        const updates: Partial<Driver> = {
+            name: data.name,
+            licensePlate: data.licensePlate.toUpperCase(),
+            vehicleModel: data.vehicleModel,
+            teamId: data.teamId || '',
+        };
+        
+        const changeDescriptions: string[] = [];
+
+        if (plateChanged || modelChanged) {
+            const updatedHistory = [...(currentDriver.licensePlateHistory || [])];
+            const lastEntry = updatedHistory.find(entry => entry.unassignedDate === null);
+            
+            if (lastEntry) {
+                lastEntry.unassignedDate = new Date().toISOString();
+            }
+
+            updatedHistory.push({
+                licensePlate: data.licensePlate.toUpperCase(),
+                vehicleModel: data.vehicleModel,
+                assignedDate: new Date().toISOString(),
+                unassignedDate: null,
+            });
+            updates.licensePlateHistory = updatedHistory;
+        }
+        
+        if (nameChanged) changeDescriptions.push(`Nome alterado de "${currentDriver.name}" para "${data.name}".`);
+        if (plateChanged) changeDescriptions.push(`Matrícula alterada de "${currentDriver.licensePlate}" para "${data.licensePlate.toUpperCase()}".`);
+        if (modelChanged) changeDescriptions.push(`Modelo do veículo alterado de "${currentDriver.vehicleModel}" para "${data.vehicleModel}".`);
+        if(teamChanged) {
+            const currentTeamName = teams.find(t => t.id === currentDriver.teamId)?.name || 'Sem Equipa';
+            const newTeamName = teams.find(t => t.id === data.teamId)?.name || 'Sem Equipa';
+            changeDescriptions.push(`Equipa alterada de "${currentTeamName}" para "${newTeamName}".`);
+        }
+
+        await updateDriver(driverToEdit.id, updates);
+
+        if (changeDescriptions.length > 0) {
+            await addFleetChangeLog({
+                driverId: driverToEdit.id,
+                driverName: data.name,
+                changeDescription: changeDescriptions.join(' ')
+            });
+        }
+
+        setIsEditDialogOpen(false);
+        setDriverToEdit(null);
+        fetchData();
+    };
+
+    const teamsMap = new Map(teams.map(t => [t.id, t.name]));
+
+    return (
+        <>
+        <Card>
+            <CardHeader>
+                <CardTitle>Todos os Motoristas</CardTitle>
+                <p className="text-sm text-muted-foreground pt-1.5">Consulte e gira todos os motoristas registados.</p>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Equipa</TableHead>
+                            <TableHead>Matrícula</TableHead>
+                            <TableHead>Modelo do Veículo</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                         {isLoading ? (
+                            [...Array(5)].map((_, i) => (
+                                <TableRow key={i}>
+                                    <TableCell><Skeleton className="h-5 w-36" /></TableCell>
+                                    <TableCell><Skeleton className="h-5 w-28" /></TableCell>
+                                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                                    <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            drivers.map((driver) => (
+                                <TableRow key={driver.id}>
+                                    <TableCell className="font-medium">{driver.name}</TableCell>
+                                    <TableCell>{teamsMap.get(driver.teamId || '') || 'Sem Equipa'}</TableCell>
+                                    <TableCell>{driver.licensePlate}</TableCell>
+                                    <TableCell>{driver.vehicleModel}</TableCell>
+                                    <TableCell className="text-right">
+                                         <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onClick={() => router.push(`/admin/drivers/${driver.id}`)}>
+                                                    <History className="mr-2 h-4 w-4" />
+                                                    Ver Histórico
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => openEditDialog(driver)}>
+                                                    <Edit className="mr-2 h-4 w-4" />
+                                                    Editar
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem 
+                                                className="text-destructive" 
+                                                onClick={(e) => { 
+                                                    e.stopPropagation(); 
+                                                    openDeleteDialog(driver);
+                                                }}
+                                                >
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    Remover
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+        
+        <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => { setIsEditDialogOpen(isOpen); if (!isOpen) setDriverToEdit(null); }}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Editar Motorista: {driverToEdit?.name}</DialogTitle>
+                </DialogHeader>
+                <Form {...editForm}>
+                    <form onSubmit={editForm.handleSubmit(onUpdateSubmit)} className="space-y-4 py-4">
+                        <FormField control={editForm.control} name="name" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Nome</FormLabel>
+                                <FormControl><Input {...field} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={editForm.control} name="licensePlate" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Matrícula</FormLabel>
+                                <FormControl><Input {...field} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={editForm.control} name="vehicleModel" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Modelo do Veículo</FormLabel>
+                                <FormControl><Input {...field} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                         <FormField control={editForm.control} name="teamId" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Equipa</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione a equipa" /></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="">Sem Equipa</SelectItem>
+                                        {teams.map(team => <SelectItem key={team.id} value={String(team.id)}>{team.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <DialogFooter>
+                            <Button variant="outline" type="button" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
+                            <Button type="submit">Guardar Alterações</Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+        
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Tem a certeza?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Isto irá remover permanentemente o motorista "{driverToDelete?.name}".
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setDriverToDelete(null)}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteDriver}>Confirmar</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        </>
+    );
+};
+
 
 const VehiclesManagement = () => {
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -717,12 +990,16 @@ export default function AdminPage() {
         <Tabs defaultValue="statistics" className="space-y-4">
             <TabsList>
                 <TabsTrigger value="statistics"><BarChart className="mr-2 h-4 w-4" /> Estatísticas</TabsTrigger>
+                <TabsTrigger value="drivers"><Contact className="mr-2 h-4 w-4" /> Motoristas</TabsTrigger>
                 <TabsTrigger value="teams"><Users className="mr-2 h-4 w-4" /> Equipas</TabsTrigger>
                 <TabsTrigger value="competitions"><Swords className="mr-2 h-4 w-4" /> Competições</TabsTrigger>
                 <TabsTrigger value="vehicles"><Car className="mr-2 h-4 w-4" /> Veículos</TabsTrigger>
             </TabsList>
             <TabsContent value="statistics">
                 <StatisticsManagement />
+            </TabsContent>
+            <TabsContent value="drivers">
+                <DriversManagement />
             </TabsContent>
             <TabsContent value="teams">
                 <TeamsManagement />
