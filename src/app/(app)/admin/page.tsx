@@ -8,6 +8,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Team, Competition, Driver } from "@/lib/data-types";
 import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition } from "@/lib/data-service";
-import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart, Trash2 } from "lucide-react";
+import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart, Trash2, Car, FileDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -85,6 +87,87 @@ const StatisticsManagement = () => {
       </CardHeader>
       <CardContent>
         <p className="text-center text-muted-foreground py-8">O conteúdo das estatísticas será adicionado aqui em breve.</p>
+      </CardContent>
+    </Card>
+  );
+};
+
+const VehiclesManagement = () => {
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    const driversData = await getAllDrivers();
+    setDrivers(driversData.sort((a,b) => a.name.localeCompare(b.name)));
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    
+    doc.text("Lista de Veículos e Motoristas", 14, 16);
+
+    (autoTable as any)(doc, {
+        startY: 20,
+        head: [['Modelo do Veículo', 'Matrícula', 'Motorista']],
+        body: drivers.map(driver => [
+            driver.vehicleModel,
+            driver.licensePlate,
+            driver.name
+        ]),
+        headStyles: { fillColor: [45, 100, 51] }, // Use your theme's primary color
+        theme: 'striped',
+    });
+
+    doc.save('lista_veiculos.pdf');
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>Frota de Veículos</CardTitle>
+          <p className="text-sm text-muted-foreground pt-1.5">Lista de todos os veículos e motoristas associados.</p>
+        </div>
+        <Button onClick={handleExportPDF} disabled={isLoading || drivers.length === 0}>
+            <FileDown className="mr-2 h-4 w-4" />
+            Exportar para PDF
+        </Button>
+      </CardHeader>
+      <CardContent className="p-0">
+         <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Modelo do Veículo</TableHead>
+                <TableHead>Matrícula</TableHead>
+                <TableHead>Motorista</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+                {isLoading ? (
+                    [...Array(5)].map((_, i) => (
+                        <TableRow key={i}>
+                            <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-36" /></TableCell>
+                        </TableRow>
+                    ))
+                ) : (
+                    drivers.map((driver) => (
+                        <TableRow key={driver.id}>
+                            <TableCell>{driver.vehicleModel}</TableCell>
+                            <TableCell>{driver.licensePlate}</TableCell>
+                            <TableCell className="font-medium">{driver.name}</TableCell>
+                        </TableRow>
+                    ))
+                )}
+            </TableBody>
+          </Table>
       </CardContent>
     </Card>
   );
@@ -543,6 +626,7 @@ export default function AdminPage() {
                 <TabsTrigger value="statistics"><BarChart className="mr-2 h-4 w-4" /> Estatísticas</TabsTrigger>
                 <TabsTrigger value="teams"><Users className="mr-2 h-4 w-4" /> Equipas</TabsTrigger>
                 <TabsTrigger value="competitions"><Swords className="mr-2 h-4 w-4" /> Competições</TabsTrigger>
+                <TabsTrigger value="vehicles"><Car className="mr-2 h-4 w-4" /> Veículos</TabsTrigger>
             </TabsList>
             <TabsContent value="statistics">
                 <StatisticsManagement />
@@ -552,6 +636,9 @@ export default function AdminPage() {
             </TabsContent>
             <TabsContent value="competitions">
                 <CompetitionsManagement />
+            </TabsContent>
+            <TabsContent value="vehicles">
+                <VehiclesManagement />
             </TabsContent>
         </Tabs>
     </>
