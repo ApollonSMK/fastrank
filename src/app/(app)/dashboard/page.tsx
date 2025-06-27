@@ -281,10 +281,12 @@ export default function DashboardPage() {
   }, [fetchData]);
 
   useEffect(() => {
+    const activeDrivers = drivers.filter(d => d.name !== '[VEÍCULO LIVRE]');
+    
     const teamFilteredDrivers =
       selectedTeamId === 'all'
-        ? [...drivers]
-        : drivers.filter((driver) => driver.teamId === selectedTeamId);
+        ? activeDrivers
+        : activeDrivers.filter((driver) => driver.teamId === selectedTeamId);
 
     const driversWithDeliveries = teamFilteredDrivers.map((driver) => {
       const totalDeliveries = driver.dailyDeliveries
