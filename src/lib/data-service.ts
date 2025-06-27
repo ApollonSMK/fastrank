@@ -1,6 +1,6 @@
 
 import { db, auth, authInitialized } from './firebase';
-import { collection, getDocs, doc, getDoc, setDoc, query, where, addDoc, updateDoc, deleteDoc, Timestamp, arrayUnion, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, query, where, addDoc, updateDoc, deleteDoc, Timestamp, arrayUnion, orderBy, limit } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import type { Driver, Team, Competition, Challenge, RankHistory, VehicleHistoryEntry, FleetChangeLog } from './data-types';
 
@@ -17,7 +17,7 @@ function docToObject<T>(doc: any): T {
 }
 
 // --- Auth Functions ---
-export async function signUpUser(driverData: Partial<Omit<Driver, 'id'>>, password: string): Promise<void> {
+export async function signUpUser(driverData: Partial<Omit<Driver, 'id' | 'authUid'>>, password: string): Promise<void> {
     if (!driverData.email || !driverData.name) {
         throw new Error("Email and name are required for signup.");
     }
@@ -32,6 +32,7 @@ export async function signUpUser(driverData: Partial<Omit<Driver, 'id'>>, passwo
     };
 
     const newDriver: Omit<Driver, 'id'> = {
+        authUid: user.uid,
         name: driverData.name,
         email: driverData.email,
         avatar: driverData.avatar || '/avatars/default.png',
@@ -50,8 +51,7 @@ export async function signUpUser(driverData: Partial<Omit<Driver, 'id'>>, passwo
         licensePlateHistory: [initialHistory],
     };
     
-    // Use the user's UID as the document ID in Firestore
-    await setDoc(doc(db, 'drivers', user.uid), newDriver);
+    await addDoc(collection(db, 'drivers'), newDriver);
 }
 
 export async function signInUser(email: string, password: string): Promise<void> {
@@ -75,7 +75,7 @@ export async function getDriver(id: string): Promise<Driver | null> {
 }
 
 export async function getDriversByTeam(teamId: string): Promise<Driver[]> {
-    const q = query(collection(db, 'drivers'), where('teamId', '==', teamId));
+    const q = query(collection(db, 'drivers'), where('teamId', '==', teamId), where('name', '!=', '[VEÍCULO LIVRE]'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(d => docToObject<Driver>(d));
 }
@@ -84,32 +84,88 @@ export async function updateDriver(id: string, data: Partial<Driver>) {
     await updateDoc(doc(db, 'drivers', id), data);
 }
 
-// NOTE: This now creates a Firebase Auth user as well.
-// This function will sign the admin out and the new user in. This is a limitation of the client-side SDK.
-export async function addDriver(driverData: Omit<Driver, 'id'>, password: string) {
-    // We can re-use the main signUpUser function
-    await signUpUser(driverData, password);
-
-    // After signUpUser creates the doc, log the event
-    const user = auth.currentUser;
-    if (user) {
-        await addFleetChangeLog({
-            driverId: user.uid,
-            driverName: driverData.name,
-            changeDescription: `Novo motorista/veículo adicionado: ${driverData.name} com ${driverData.vehicleModel} (${driverData.licensePlate}).`
-        });
+export async function assignDriverToVehicle(vehicleId: string, driverData: Omit<Driver, 'id' | 'authUid' | 'licensePlate' | 'vehicleModel' | 'licensePlateHistory' | 'rank' | 'points' | 'moneyBalance' | 'trips' | 'safetyScore' | 'efficiency' | 'dailyDeliveries' | 'notifications' | 'achievementIds'>, password: string) {
+    const vehicle = await getDriver(vehicleId);
+    if (!vehicle || vehicle.name !== '[VEÍCULO LIVRE]') {
+        throw new Error("Vehicle not found or is not available.");
     }
+    if (!driverData.email) {
+         throw new Error("Email is required.");
+    }
+
+    const userCredential = await createUserWithEmailAndPassword(auth, driverData.email, password);
+    const user = userCredential.user;
+
+    const updates: Partial<Driver> = {
+        authUid: user.uid,
+        name: driverData.name,
+        email: driverData.email,
+        teamId: driverData.teamId,
+        avatar: driverData.avatar || '/avatars/default.png',
+        rank: 999,
+        points: 0,
+        moneyBalance: 0,
+        trips: 0,
+        safetyScore: 100,
+        efficiency: 100,
+        dailyDeliveries: [],
+        notifications: [],
+        achievementIds: [],
+    };
+
+    await updateDriver(vehicleId, updates);
+
+    await addFleetChangeLog({
+        driverId: vehicleId,
+        driverName: driverData.name,
+        changeDescription: `Motorista ${driverData.name} associado ao veículo ${vehicle.licensePlate}.`
+    });
 }
 
+
+export async function addFreeVehicle(data: { licensePlate: string; vehicleModel: string; }) {
+    const initialHistory: VehicleHistoryEntry = {
+        licensePlate: data.licensePlate,
+        vehicleModel: data.vehicleModel,
+        assignedDate: new Date().toISOString(),
+        unassignedDate: null,
+    };
+    
+    const freeVehicle: Omit<Driver, 'id'> = {
+        authUid: null,
+        name: '[VEÍCULO LIVRE]',
+        email: '',
+        licensePlate: data.licensePlate,
+        vehicleModel: data.vehicleModel,
+        teamId: '',
+        avatar: '/avatars/default.png',
+        rank: 999,
+        points: 0,
+        moneyBalance: 0,
+        trips: 0,
+        safetyScore: 100,
+        efficiency: 100,
+        dailyDeliveries: [],
+        notifications: [],
+        achievementIds: [],
+        licensePlateHistory: [initialHistory],
+    };
+
+    const docRef = await addDoc(collection(db, 'drivers'), freeVehicle);
+
+    await addFleetChangeLog({
+        driverId: docRef.id,
+        driverName: '[VEÍCULO LIVRE]',
+        changeDescription: `Novo veículo livre adicionado: ${data.vehicleModel} (${data.licensePlate}).`
+    });
+}
+
+
 export async function deleteDriver(id: string) {
-    // This function doesn't actually delete the driver, but rather converts them
-    // into a "Free Vehicle" by clearing personal data but keeping vehicle data.
-    // The associated Firebase Auth user is not touched.
     const driverToDelete = await getDriver(id);
     if (!driverToDelete) return;
     
     if (driverToDelete.name === '[VEÍCULO LIVRE]') {
-        // If it's already a free vehicle, delete it permanently.
         await addFleetChangeLog({
             driverId: id,
             driverName: '[VEÍCULO LIVRE]',
@@ -117,10 +173,10 @@ export async function deleteDriver(id: string) {
         });
         await deleteDoc(doc(db, 'drivers', id));
     } else {
-        // If it's an active driver, convert them to a free vehicle.
-        const updates = {
+        const updates: Partial<Driver> = {
             name: '[VEÍCULO LIVRE]',
-            email: `deleted-${id}@fastrack.lu`, // Placeholder to avoid conflicts
+            email: '',
+            authUid: null,
             teamId: '',
             avatar: '/avatars/default.png',
             rank: 999,
@@ -134,7 +190,7 @@ export async function deleteDriver(id: string) {
             achievementIds: [],
         };
         
-        await updateDoc(doc(db, 'drivers', id), updates);
+        await updateDoc(doc(db, 'drivers', id), updates as any);
 
         await addFleetChangeLog({
             driverId: id,
@@ -254,8 +310,13 @@ export async function getLoggedInDriver(): Promise<Driver | null> {
     const user = auth.currentUser;
     if (user) {
         try {
-            const driver = await getDriver(user.uid);
-            // Don't return anything if the user is a "free vehicle" placeholder
+            const q = query(collection(db, "drivers"), where("authUid", "==", user.uid), limit(1));
+            const snapshot = await getDocs(q);
+            if (snapshot.empty) {
+                return null;
+            }
+            const driver = docToObject<Driver>(snapshot.docs[0]);
+            
             if (driver && driver.name === '[VEÍCULO LIVRE]') {
                 return null;
             }

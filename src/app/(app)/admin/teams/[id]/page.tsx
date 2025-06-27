@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Driver, DailyDelivery, Team, achievements, VehicleHistoryEntry } from '@/lib/data-types';
-import { getTeam, getAllTeams, getDriversByTeam, addDriver, updateDriver, deleteDriver, getDriver, addFleetChangeLog, getAllDrivers } from '@/lib/data-service';
+import { getTeam, getAllTeams, getDriversByTeam, assignDriverToVehicle, updateDriver, deleteDriver, getDriver, addFleetChangeLog, getAllDrivers } from '@/lib/data-service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,10 +54,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const addFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
-  licensePlate: z.string().min(1, { message: "A matrícula é obrigatória." }),
-  vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
   emailUsername: z.string().min(1, { message: 'O nome de utilizador do email é obrigatório.' }),
   password: z.string().min(6, { message: 'A senha deve ter pelo menos 6 caracteres.' }),
+  vehicleId: z.string().min(1, { message: 'É obrigatório selecionar um veículo.' }),
 });
 type AddFormValues = z.infer<typeof addFormSchema>;
 
@@ -83,6 +82,7 @@ export default function TeamDetailsPage() {
   const [team, setTeam] = useState<Team | null>(null);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
+  const [freeVehicles, setFreeVehicles] = useState<Driver[]>([]);
   const [teamMembers, setTeamMembers] = useState<Driver[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -110,6 +110,7 @@ export default function TeamDetailsPage() {
     setTeamMembers(membersData);
     setAllTeams(allTeamsData);
     setAllDrivers(allDriversData);
+    setFreeVehicles(allDriversData.filter(d => d.name === '[VEÍCULO LIVRE]'));
     setIsLoading(false);
   }, [teamId]);
 
@@ -121,10 +122,9 @@ export default function TeamDetailsPage() {
     resolver: zodResolver(addFormSchema),
     defaultValues: {
       name: "",
-      licensePlate: "",
-      vehicleModel: "",
       emailUsername: "",
       password: "",
+      vehicleId: "",
     },
   });
 
@@ -172,38 +172,13 @@ export default function TeamDetailsPage() {
   }
 
   const onAddSubmit: SubmitHandler<AddFormValues> = async (data) => {
-    const plateExists = allDrivers.some(d => d.licensePlate.toUpperCase() === data.licensePlate.toUpperCase());
-    if (plateExists) {
-        addForm.setError("licensePlate", {
-            type: "manual",
-            message: "Esta matrícula já está a ser utilizada por outro motorista."
-        });
-        return;
-    }
-
-    // Note: creating a user via the admin panel will sign the admin out
-    // and sign the new user in. This is a limitation of the Firebase client SDK.
-    // The admin will need to log back in.
-    const newDriver: Omit<Driver, 'id'> = {
+    const newDriverData = {
       name: data.name,
       email: `${data.emailUsername}@fastrack.lu`,
-      licensePlate: data.licensePlate.toUpperCase(),
-      vehicleModel: data.vehicleModel,
       teamId: team.id,
-      avatar: '/avatars/default.png',
-      rank: 999, // Rank should be recalculated globally
-      points: 0,
-      moneyBalance: 0,
-      trips: 0,
-      safetyScore: 100,
-      efficiency: 100,
-      dailyDeliveries: [],
-      notifications: [],
-      achievementIds: [],
-      licensePlateHistory: [], // this will be initialized in signUpUser
     };
-
-    await addDriver(newDriver, data.password);
+    
+    await assignDriverToVehicle(data.vehicleId, newDriverData, data.password);
     addForm.reset();
     fetchData();
   };
@@ -446,7 +421,7 @@ export default function TeamDetailsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Adicionar Novo Membro</CardTitle>
-            <CardDescription>Crie um novo motorista e adicione-o a esta equipa.</CardDescription>
+            <CardDescription>Crie um novo motorista e associe-o a um veículo livre.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...addForm}>
@@ -466,26 +441,24 @@ export default function TeamDetailsPage() {
                 />
                 <FormField
                   control={addForm.control}
-                  name="licensePlate"
+                  name="vehicleId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Matrícula</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: LU12345" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={addForm.control}
-                  name="vehicleModel"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Modelo do Veículo</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Renault Clio" {...field} />
-                      </FormControl>
+                      <FormLabel>Veículo Livre</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Selecione um veículo livre" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                            {freeVehicles.length > 0 ? (
+                                freeVehicles.map(v => (
+                                    <SelectItem key={v.id} value={v.id}>
+                                        {v.licensePlate} - {v.vehicleModel}
+                                    </SelectItem>
+                                ))
+                            ) : (
+                                <SelectItem value="none" disabled>Não há veículos livres</SelectItem>
+                            )}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -519,7 +492,7 @@ export default function TeamDetailsPage() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={addForm.formState.isSubmitting}>
+                <Button type="submit" disabled={addForm.formState.isSubmitting || freeVehicles.length === 0}>
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Adicionar Membro
                 </Button>
@@ -600,8 +573,7 @@ export default function TeamDetailsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Tem a certeza?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Isto irá remover permanentemente o motorista
-              e os seus dados da aplicação.
+              Esta ação irá remover o motorista "{selectedDriver?.name}". O veículo associado ficará livre.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

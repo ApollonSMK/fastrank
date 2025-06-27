@@ -45,6 +45,7 @@ export type VehicleHistoryEntry = {
 
 export type Driver = {
   id: string; // Firestore ID
+  authUid: string | null; // Firebase Auth User ID
   name: string;
   email: string;
   avatar: string;

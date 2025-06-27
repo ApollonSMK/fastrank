@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Team, Competition, Driver, FleetChangeLog } from "@/lib/data-types";
-import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition, getFleetChangeLog, updateDriver, getDriver, deleteDriver, addFleetChangeLog } from "@/lib/data-service";
+import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition, getFleetChangeLog, updateDriver, getDriver, deleteDriver, addFleetChangeLog, addFreeVehicle } from "@/lib/data-service";
 import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart, Trash2, Car, FileDown, Contact, History, Edit } from "lucide-react";
 import {
   DropdownMenu,
@@ -85,6 +85,13 @@ const editDriverFormSchema = z.object({
   teamId: z.string().optional(),
 });
 type EditDriverFormValues = z.infer<typeof editDriverFormSchema>;
+
+const addVehicleFormSchema = z.object({
+    licensePlate: z.string().min(1, { message: "A matrícula é obrigatória." }),
+    vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
+});
+type AddVehicleFormValues = z.infer<typeof addVehicleFormSchema>;
+
 
 const StatisticsManagement = () => {
   return (
@@ -391,6 +398,7 @@ const VehiclesManagement = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [changeLog, setChangeLog] = useState<FleetChangeLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddVehicleDialogOpen, setIsAddVehicleDialogOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -400,7 +408,6 @@ const VehiclesManagement = () => {
       getAllTeams(),
     ]);
     
-    // Sort by license plate, as requested.
     driversData.sort((a, b) => a.licensePlate.localeCompare(b.licensePlate));
 
     setVehicles(driversData);
@@ -412,6 +419,26 @@ const VehiclesManagement = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const addVehicleForm = useForm<AddVehicleFormValues>({
+    resolver: zodResolver(addVehicleFormSchema),
+  });
+
+  const onAddVehicleSubmit: SubmitHandler<AddVehicleFormValues> = async (data) => {
+    const plateExists = vehicles.some(v => v.licensePlate.toUpperCase() === data.licensePlate.toUpperCase());
+    if (plateExists) {
+        addVehicleForm.setError("licensePlate", {
+            type: "manual",
+            message: "Esta matrícula já existe na frota."
+        });
+        return;
+    }
+
+    await addFreeVehicle(data);
+    setIsAddVehicleDialogOpen(false);
+    addVehicleForm.reset();
+    fetchData();
+  };
 
   const handleExportFleetPDF = () => {
     const doc = new jsPDF();
@@ -465,6 +492,7 @@ const VehiclesManagement = () => {
   const teamsMap = new Map(teams.map(t => [t.id, t.name]));
 
   return (
+    <>
     <Card>
         <CardHeader>
             <CardTitle>Frota de Veículos</CardTitle>
@@ -477,10 +505,56 @@ const VehiclesManagement = () => {
                     <TabsTrigger value="history">Histórico de Alterações</TabsTrigger>
                 </TabsList>
                 <TabsContent value="current" className="mt-4">
-                    <div className="flex justify-end mb-4">
+                    <div className="flex justify-end mb-4 gap-2">
+                        <Dialog open={isAddVehicleDialogOpen} onOpenChange={setIsAddVehicleDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline">
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    Adicionar Veículo Livre
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Adicionar Veículo Livre</DialogTitle>
+                                    <DialogDescription>
+                                        Cadastre um novo veículo na frota. Ele ficará disponível para ser associado a um novo motorista.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <Form {...addVehicleForm}>
+                                    <form onSubmit={addVehicleForm.handleSubmit(onAddVehicleSubmit)} className="space-y-4 py-4">
+                                        <FormField
+                                            control={addVehicleForm.control}
+                                            name="licensePlate"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                <FormLabel>Matrícula</FormLabel>
+                                                <FormControl><Input placeholder="Ex: AB-12-CD" {...field} /></FormControl>
+                                                <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={addVehicleForm.control}
+                                            name="vehicleModel"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                <FormLabel>Modelo do Veículo</FormLabel>
+                                                <FormControl><Input placeholder="Ex: Renault Clio" {...field} /></FormControl>
+                                                <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <DialogFooter>
+                                            <Button variant="outline" type="button" onClick={() => setIsAddVehicleDialogOpen(false)}>Cancelar</Button>
+                                            <Button type="submit">Adicionar Veículo</Button>
+                                        </DialogFooter>
+                                    </form>
+                                </Form>
+                            </DialogContent>
+                        </Dialog>
                         <Button onClick={handleExportFleetPDF} disabled={isLoading || vehicles.length === 0}>
                             <FileDown className="mr-2 h-4 w-4" />
-                            Exportar Frota para PDF
+                            Exportar Frota
                         </Button>
                     </div>
                      <Table>
@@ -559,6 +633,7 @@ const VehiclesManagement = () => {
             </Tabs>
         </CardContent>
     </Card>
+    </>
   );
 };
 
