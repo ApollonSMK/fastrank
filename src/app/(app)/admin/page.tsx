@@ -19,8 +19,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Team, Competition, Driver } from "@/lib/data-types";
-import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers } from "@/lib/data-service";
-import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart } from "lucide-react";
+import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition } from "@/lib/data-service";
+import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +37,16 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -224,6 +234,8 @@ const CompetitionsManagement = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [isAddCompetitionDialogOpen, setIsAddCompetitionDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [competitionToDelete, setCompetitionToDelete] = useState<Competition | null>(null);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -280,6 +292,19 @@ const CompetitionsManagement = () => {
     deliveries: "Total de Entregas",
     safety: "Pontuação de Segurança",
     efficiency: "Eficiência",
+  };
+
+  const openDeleteDialog = (competition: Competition) => {
+    setCompetitionToDelete(competition);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteCompetition = async () => {
+    if (!competitionToDelete) return;
+    await deleteCompetition(competitionToDelete.id);
+    setIsDeleteDialogOpen(false);
+    setCompetitionToDelete(null);
+    fetchData();
   };
 
   return (
@@ -469,7 +494,16 @@ const CompetitionsManagement = () => {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => router.push(`/competitions/${comp.id}`)}>Ver Leaderboard</DropdownMenuItem>
                             <DropdownMenuItem>Editar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">Remover</DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-destructive" 
+                              onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  openDeleteDialog(comp);
+                              }}
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remover
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -481,6 +515,20 @@ const CompetitionsManagement = () => {
           </Table>
         </CardContent>
       </Card>
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Tem a certeza?</AlertDialogTitle>
+                <AlertDialogDescription>
+                Esta ação não pode ser desfeita. Isto irá remover permanentemente a competição "{competitionToDelete?.name}".
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setCompetitionToDelete(null)}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteCompetition}>Confirmar</AlertDialogAction>
+            </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </div>
   );
 };

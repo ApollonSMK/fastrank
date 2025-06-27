@@ -127,6 +127,10 @@ export async function addCompetition(compData: Omit<Competition, 'id'>) {
     return await addDoc(collection(db, 'competitions'), dataWithTimestamps);
 }
 
+export async function deleteCompetition(id: string) {
+    await deleteDoc(doc(db, 'competitions', id));
+}
+
 export async function enrollInCompetition(competitionId: string, driverId: string) {
     const competitionRef = doc(db, 'competitions', competitionId);
     await updateDoc(competitionRef, {
@@ -189,5 +193,3 @@ export async function getLoggedInDriver(): Promise<Driver | null> {
     }
     return null;
 }
-
-    
