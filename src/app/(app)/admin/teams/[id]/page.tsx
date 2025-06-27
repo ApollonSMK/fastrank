@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Driver, DailyDelivery, Team, achievements, VehicleHistoryEntry } from '@/lib/data-types';
-import { getTeam, getAllTeams, getDriversByTeam, addDriver, updateDriver, deleteDriver, getDriver, addFleetChangeLog } from '@/lib/data-service';
+import { getTeam, getAllTeams, getDriversByTeam, addDriver, updateDriver, deleteDriver, getDriver, addFleetChangeLog, getAllDrivers } from '@/lib/data-service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,6 +82,7 @@ export default function TeamDetailsPage() {
   
   const [team, setTeam] = useState<Team | null>(null);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
+  const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
   const [teamMembers, setTeamMembers] = useState<Driver[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -99,14 +100,16 @@ export default function TeamDetailsPage() {
   const fetchData = useCallback(async () => {
     if (!teamId) return;
     setIsLoading(true);
-    const [teamData, membersData, allTeamsData] = await Promise.all([
+    const [teamData, membersData, allTeamsData, allDriversData] = await Promise.all([
         getTeam(teamId),
         getDriversByTeam(teamId),
-        getAllTeams()
+        getAllTeams(),
+        getAllDrivers()
     ]);
     setTeam(teamData);
     setTeamMembers(membersData);
     setAllTeams(allTeamsData);
+    setAllDrivers(allDriversData);
     setIsLoading(false);
   }, [teamId]);
 
@@ -169,6 +172,15 @@ export default function TeamDetailsPage() {
   }
 
   const onAddSubmit: SubmitHandler<AddFormValues> = async (data) => {
+    const plateExists = allDrivers.some(d => d.licensePlate.toUpperCase() === data.licensePlate.toUpperCase());
+    if (plateExists) {
+        addForm.setError("licensePlate", {
+            type: "manual",
+            message: "Esta matrícula já está a ser utilizada por outro motorista."
+        });
+        return;
+    }
+
     // Note: creating a user via the admin panel will sign the admin out
     // and sign the new user in. This is a limitation of the Firebase client SDK.
     // The admin will need to log back in.
@@ -198,6 +210,21 @@ export default function TeamDetailsPage() {
 
   const onUpdateSubmit: SubmitHandler<EditFormValues> = async (data) => {
     if (!driverToEdit) return;
+
+    const newPlate = data.licensePlate.toUpperCase();
+    if (newPlate !== driverToEdit.licensePlate.toUpperCase()) {
+        const plateExists = allDrivers.some(driver =>
+            driver.id !== driverToEdit.id &&
+            driver.licensePlate.toUpperCase() === newPlate
+        );
+        if (plateExists) {
+            editForm.setError("licensePlate", {
+                type: "manual",
+                message: "Esta matrícula já está a ser utilizada por outro motorista."
+            });
+            return;
+        }
+    }
 
     const currentDriver = await getDriver(driverToEdit.id);
     if (!currentDriver) return;

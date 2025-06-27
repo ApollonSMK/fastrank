@@ -157,6 +157,21 @@ const DriversManagement = () => {
     const onUpdateSubmit: SubmitHandler<EditDriverFormValues> = async (data) => {
         if (!driverToEdit) return;
 
+        const newPlate = data.licensePlate.toUpperCase();
+        if (newPlate !== driverToEdit.licensePlate.toUpperCase()) {
+            const plateExists = drivers.some(driver =>
+                driver.id !== driverToEdit.id &&
+                driver.licensePlate.toUpperCase() === newPlate
+            );
+            if (plateExists) {
+                editForm.setError("licensePlate", {
+                    type: "manual",
+                    message: "Esta matrícula já está a ser utilizada por outro motorista."
+                });
+                return;
+            }
+        }
+
         const currentDriver = await getDriver(driverToEdit.id);
         if (!currentDriver) return;
 
