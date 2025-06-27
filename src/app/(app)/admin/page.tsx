@@ -209,8 +209,8 @@ const DriversManagement = () => {
                 return;
             }
 
-            // Move all driver-specific data from old vehicle doc to new one
-            const updatesForNewVehicle: Partial<Driver> = {
+            // A. Prepare data objects
+            const driverPersonalData = {
                 authUid: oldVehicleDoc.authUid || null,
                 name: data.name,
                 email: oldVehicleDoc.email || '',
@@ -225,11 +225,9 @@ const DriversManagement = () => {
                 dailyDeliveries: oldVehicleDoc.dailyDeliveries || [],
                 achievementIds: oldVehicleDoc.achievementIds || [],
                 notifications: oldVehicleDoc.notifications || [],
-                // licensePlateHistory is NOT moved, as it belongs to the vehicle entity.
             };
 
-            // Reset the old vehicle to be free
-            const updatesForOldVehicle: Partial<Driver> = {
+            const freeVehicleData = {
                  name: '[VEÍCULO LIVRE]',
                  email: '',
                  authUid: null,
@@ -245,12 +243,15 @@ const DriversManagement = () => {
                  notifications: [],
                  achievementIds: [],
             };
-            
-            await Promise.all([
-                updateDriver(newVehicleDoc.id, updatesForNewVehicle),
-                updateDriver(oldVehicleDoc.id, updatesForOldVehicle),
-            ]);
 
+            // B. Execute updates sequentially to prevent race conditions with authUid
+            // 1. First, assign the driver data to the new vehicle.
+            await updateDriver(newVehicleDoc.id, driverPersonalData);
+            
+            // 2. Then, reset the old vehicle to be free.
+            await updateDriver(oldVehicleDoc.id, freeVehicleData);
+
+            // C. Log the change
             await addFleetChangeLog({
                 driverId: newVehicleDoc.id, // Log against the new document ID
                 driverName: data.name,
