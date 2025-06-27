@@ -3,13 +3,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Driver, DailyDelivery, Team, achievements } from '@/lib/data-types';
-import { getTeam, getAllTeams, getDriversByTeam, addDriver, updateDriver, deleteDriver, getDriver } from '@/lib/data-service';
+import { Driver, DailyDelivery, Team, achievements, VehicleHistoryEntry } from '@/lib/data-types';
+import { getTeam, getAllTeams, getDriversByTeam, addDriver, updateDriver, deleteDriver, getDriver, addFleetChangeLog } from '@/lib/data-service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, ArrowLeft, MoreVertical, Trash2, Calendar as CalendarIcon, Edit } from 'lucide-react';
+import { PlusCircle, ArrowLeft, MoreVertical, Trash2, Calendar as CalendarIcon, Edit, History } from 'lucide-react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -188,6 +188,7 @@ export default function TeamDetailsPage() {
       dailyDeliveries: [],
       notifications: [],
       achievementIds: [],
+      licensePlateHistory: [], // this will be initialized in signUpUser
     };
 
     await addDriver(newDriver, data.password);
@@ -197,11 +198,50 @@ export default function TeamDetailsPage() {
 
   const onUpdateSubmit: SubmitHandler<EditFormValues> = async (data) => {
     if (!driverToEdit) return;
-    await updateDriver(driverToEdit.id, {
-        name: data.name,
-        licensePlate: data.licensePlate.toUpperCase(),
-        vehicleModel: data.vehicleModel,
-    });
+
+    const currentDriver = await getDriver(driverToEdit.id);
+    if (!currentDriver) return;
+
+    const plateChanged = currentDriver.licensePlate.toUpperCase() !== data.licensePlate.toUpperCase();
+    const modelChanged = currentDriver.vehicleModel !== data.vehicleModel;
+
+    if (plateChanged || modelChanged) {
+        const updatedHistory = [...(currentDriver.licensePlateHistory || [])];
+        const lastEntryIndex = updatedHistory.findIndex(entry => entry.unassignedDate === null);
+        
+        if (lastEntryIndex > -1) {
+            updatedHistory[lastEntryIndex].unassignedDate = new Date().toISOString();
+        }
+
+        updatedHistory.push({
+            licensePlate: data.licensePlate.toUpperCase(),
+            vehicleModel: data.vehicleModel,
+            assignedDate: new Date().toISOString(),
+            unassignedDate: null,
+        });
+
+        await updateDriver(driverToEdit.id, {
+            name: data.name,
+            licensePlate: data.licensePlate.toUpperCase(),
+            vehicleModel: data.vehicleModel,
+            licensePlateHistory: updatedHistory
+        });
+
+        await addFleetChangeLog({
+            driverId: driverToEdit.id,
+            driverName: data.name,
+            changeDescription: `Veículo de ${data.name} atualizado para ${data.vehicleModel} (${data.licensePlate.toUpperCase()}).`
+        });
+
+    } else if (currentDriver.name !== data.name) {
+        await updateDriver(driverToEdit.id, { name: data.name });
+         await addFleetChangeLog({
+            driverId: driverToEdit.id,
+            driverName: data.name,
+            changeDescription: `Nome do motorista alterado de ${currentDriver.name} para ${data.name}.`
+        });
+    }
+
     setIsEditDialogOpen(false);
     setDriverToEdit(null);
     fetchData();
@@ -242,7 +282,20 @@ export default function TeamDetailsPage() {
   
   const handleTransferDriver = async () => {
     if (!selectedDriver || !targetTeamId) return;
+
+    const currentTeam = allTeams.find(t => t.id === selectedDriver?.teamId);
+    const targetTeam = allTeams.find(t => t.id === targetTeamId);
+
+    if (!targetTeam) return;
+
     await updateDriver(selectedDriver.id, { teamId: targetTeamId });
+
+    await addFleetChangeLog({
+        driverId: selectedDriver.id,
+        driverName: selectedDriver.name,
+        changeDescription: `Motorista ${selectedDriver.name} transferido da equipa ${currentTeam?.name || 'N/A'} para ${targetTeam.name}.`
+    });
+
     setIsTransferDialogOpen(false);
     setSelectedDriver(null);
     setTargetTeamId('');
@@ -458,6 +511,10 @@ export default function TeamDetailsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                             <DropdownMenuItem onClick={() => router.push(`/admin/drivers/${member.id}`)}>
+                                <History className="mr-2 h-4 w-4" />
+                                Ver Histórico
+                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openEditDialog(member)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Editar

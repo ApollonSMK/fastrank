@@ -20,8 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Team, Competition, Driver } from "@/lib/data-types";
-import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition } from "@/lib/data-service";
+import { Team, Competition, Driver, FleetChangeLog } from "@/lib/data-types";
+import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition, getFleetChangeLog } from "@/lib/data-service";
 import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart, Trash2, Car, FileDown } from "lucide-react";
 import {
   DropdownMenu,
@@ -94,12 +94,17 @@ const StatisticsManagement = () => {
 
 const VehiclesManagement = () => {
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [changeLog, setChangeLog] = useState<FleetChangeLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
-    const driversData = await getAllDrivers();
+    const [driversData, logData] = await Promise.all([
+      getAllDrivers(),
+      getFleetChangeLog(),
+    ]);
     setDrivers(driversData.sort((a,b) => a.name.localeCompare(b.name)));
+    setChangeLog(logData);
     setIsLoading(false);
   }, []);
 
@@ -107,10 +112,11 @@ const VehiclesManagement = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleExportPDF = () => {
+  const handleExportFleetPDF = () => {
     const doc = new jsPDF();
+    const today = format(new Date(), "dd/MM/yyyy");
     
-    doc.text("Lista de Veículos e Motoristas", 14, 16);
+    doc.text(`Lista de Veículos e Motoristas - ${today}`, 14, 16);
 
     (autoTable as any)(doc, {
         startY: 20,
@@ -120,55 +126,120 @@ const VehiclesManagement = () => {
             driver.licensePlate,
             driver.name
         ]),
-        headStyles: { fillColor: [45, 100, 51] }, // Use your theme's primary color
+        headStyles: { fillColor: [45, 100, 51] },
         theme: 'striped',
     });
 
-    doc.save('lista_veiculos.pdf');
+    doc.save(`lista_veiculos_${today.replace(/\//g, '-')}.pdf`);
+  };
+
+  const handleExportHistoryPDF = () => {
+    const doc = new jsPDF();
+    const today = format(new Date(), "dd/MM/yyyy");
+    
+    doc.text(`Histórico de Alterações da Frota - ${today}`, 14, 16);
+
+    (autoTable as any)(doc, {
+        startY: 20,
+        head: [['Data', 'Motorista', 'Descrição da Alteração']],
+        body: changeLog.map(log => [
+            format(new Date(log.date), "dd/MM/yyyy HH:mm"),
+            log.driverName,
+            log.changeDescription
+        ]),
+        headStyles: { fillColor: [45, 100, 51] },
+        theme: 'striped',
+    });
+
+    doc.save(`historico_frota_${today.replace(/\//g, '-')}.pdf`);
   };
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Frota de Veículos</CardTitle>
-          <p className="text-sm text-muted-foreground pt-1.5">Lista de todos os veículos e motoristas associados.</p>
-        </div>
-        <Button onClick={handleExportPDF} disabled={isLoading || drivers.length === 0}>
-            <FileDown className="mr-2 h-4 w-4" />
-            Exportar para PDF
-        </Button>
-      </CardHeader>
-      <CardContent className="p-0">
-         <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Modelo do Veículo</TableHead>
-                <TableHead>Matrícula</TableHead>
-                <TableHead>Motorista</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-                {isLoading ? (
-                    [...Array(5)].map((_, i) => (
-                        <TableRow key={i}>
-                            <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                            <TableCell><Skeleton className="h-5 w-36" /></TableCell>
-                        </TableRow>
-                    ))
-                ) : (
-                    drivers.map((driver) => (
-                        <TableRow key={driver.id}>
-                            <TableCell>{driver.vehicleModel}</TableCell>
-                            <TableCell>{driver.licensePlate}</TableCell>
-                            <TableCell className="font-medium">{driver.name}</TableCell>
-                        </TableRow>
-                    ))
-                )}
-            </TableBody>
-          </Table>
-      </CardContent>
+        <CardHeader>
+            <CardTitle>Frota de Veículos</CardTitle>
+            <p className="text-sm text-muted-foreground pt-1.5">Consulte a frota atual e o histórico de alterações.</p>
+        </CardHeader>
+        <CardContent>
+            <Tabs defaultValue="current">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="current">Frota Atual</TabsTrigger>
+                    <TabsTrigger value="history">Histórico de Alterações</TabsTrigger>
+                </TabsList>
+                <TabsContent value="current" className="mt-4">
+                    <div className="flex justify-end mb-4">
+                        <Button onClick={handleExportFleetPDF} disabled={isLoading || drivers.length === 0}>
+                            <FileDown className="mr-2 h-4 w-4" />
+                            Exportar Frota para PDF
+                        </Button>
+                    </div>
+                     <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Modelo do Veículo</TableHead>
+                            <TableHead>Matrícula</TableHead>
+                            <TableHead>Motorista</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading ? (
+                                [...Array(5)].map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                        <TableCell><Skeleton className="h-5 w-36" /></TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                drivers.map((driver) => (
+                                    <TableRow key={driver.id}>
+                                        <TableCell>{driver.vehicleModel}</TableCell>
+                                        <TableCell>{driver.licensePlate}</TableCell>
+                                        <TableCell className="font-medium">{driver.name}</TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                      </Table>
+                </TabsContent>
+                <TabsContent value="history" className="mt-4">
+                    <div className="flex justify-end mb-4">
+                        <Button onClick={handleExportHistoryPDF} disabled={isLoading || changeLog.length === 0}>
+                            <FileDown className="mr-2 h-4 w-4" />
+                            Exportar Histórico para PDF
+                        </Button>
+                    </div>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Data</TableHead>
+                                <TableHead>Motorista</TableHead>
+                                <TableHead>Descrição</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading ? (
+                                [...Array(5)].map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                                        <TableCell><Skeleton className="h-5 w-36" /></TableCell>
+                                        <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                changeLog.map((log) => (
+                                    <TableRow key={log.id}>
+                                        <TableCell>{format(new Date(log.date), "dd/MM/yyyy HH:mm")}</TableCell>
+                                        <TableCell className="font-medium">{log.driverName}</TableCell>
+                                        <TableCell>{log.changeDescription}</TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </TabsContent>
+            </Tabs>
+        </CardContent>
     </Card>
   );
 };

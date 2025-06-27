@@ -36,6 +36,13 @@ export type Challenge = {
   winnerId?: string | null;
 };
 
+export type VehicleHistoryEntry = {
+  licensePlate: string;
+  vehicleModel: string;
+  assignedDate: string; // ISO
+  unassignedDate: string | null; // ISO
+};
+
 export type Driver = {
   id: string; // Firestore ID
   name: string;
@@ -54,6 +61,7 @@ export type Driver = {
   dailyDeliveries: DailyDelivery[];
   achievementIds: string[];
   notifications: Notification[];
+  licensePlateHistory: VehicleHistoryEntry[];
 };
 
 export type Team = {
@@ -79,6 +87,15 @@ export type Competition = {
   rewardType: 'points' | 'money';
   rewardAmount: number;
 };
+
+export type FleetChangeLog = {
+  id: string; // Firestore ID
+  date: string; // ISO
+  driverId: string;
+  driverName: string;
+  changeDescription: string;
+};
+
 
 // This is static data, so we can keep it here.
 export const achievements: Achievements = {

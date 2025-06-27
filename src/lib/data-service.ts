@@ -1,8 +1,8 @@
 
 import { db, auth, authInitialized } from './firebase';
-import { collection, getDocs, doc, getDoc, setDoc, query, where, addDoc, updateDoc, deleteDoc, Timestamp, arrayUnion } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, query, where, addDoc, updateDoc, deleteDoc, Timestamp, arrayUnion, orderBy } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import type { Driver, Team, Competition, Challenge, RankHistory } from './data-types';
+import type { Driver, Team, Competition, Challenge, RankHistory, VehicleHistoryEntry, FleetChangeLog } from './data-types';
 
 // Helper function to convert Firestore doc to a usable object with ID
 function docToObject<T>(doc: any): T {
@@ -24,6 +24,13 @@ export async function signUpUser(driverData: Partial<Omit<Driver, 'id'>>, passwo
     const userCredential = await createUserWithEmailAndPassword(auth, driverData.email, password);
     const user = userCredential.user;
 
+    const initialHistory: VehicleHistoryEntry = {
+        licensePlate: driverData.licensePlate || 'N/A',
+        vehicleModel: driverData.vehicleModel || 'N/A',
+        assignedDate: new Date().toISOString(),
+        unassignedDate: null,
+    };
+
     const newDriver: Omit<Driver, 'id'> = {
         name: driverData.name,
         email: driverData.email,
@@ -40,6 +47,7 @@ export async function signUpUser(driverData: Partial<Omit<Driver, 'id'>>, passwo
         dailyDeliveries: [],
         notifications: [],
         achievementIds: [],
+        licensePlateHistory: [initialHistory],
     };
     
     // Use the user's UID as the document ID in Firestore
@@ -81,12 +89,30 @@ export async function updateDriver(id: string, data: Partial<Driver>) {
 export async function addDriver(driverData: Omit<Driver, 'id'>, password: string) {
     // We can re-use the main signUpUser function
     await signUpUser(driverData, password);
+
+    // After signUpUser creates the doc, log the event
+    const user = auth.currentUser;
+    if (user) {
+        await addFleetChangeLog({
+            driverId: user.uid,
+            driverName: driverData.name,
+            changeDescription: `Novo motorista/veículo adicionado: ${driverData.name} com ${driverData.vehicleModel} (${driverData.licensePlate}).`
+        });
+    }
 }
 
 export async function deleteDriver(id: string) {
     // Note: This only deletes the Firestore record, not the Firebase Auth user.
     // Deleting an auth user requires admin privileges or re-authentication,
     // which is better handled in a server environment.
+    const driverToDelete = await getDriver(id);
+    if(driverToDelete) {
+        await addFleetChangeLog({
+            driverId: id,
+            driverName: driverToDelete.name,
+            changeDescription: `Motorista removido: ${driverToDelete.name}.`
+        });
+    }
     await deleteDoc(doc(db, 'drivers', id));
 }
 
@@ -175,6 +201,22 @@ export async function getRankingHistory(): Promise<RankHistory[]> {
     const q = query(collection(db, 'rankingHistory'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(h => docToObject<RankHistory>(h));
+}
+
+
+// --- Fleet History ---
+export async function addFleetChangeLog(logData: Omit<FleetChangeLog, 'id'>) {
+    const dataWithTimestamp = {
+        ...logData,
+        date: Timestamp.now()
+    };
+    return await addDoc(collection(db, 'fleetChangeLog'), dataWithTimestamp);
+}
+
+export async function getFleetChangeLog(): Promise<FleetChangeLog[]> {
+    const q = query(collection(db, 'fleetChangeLog'), orderBy('date', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(l => docToObject<FleetChangeLog>(l));
 }
 
 
