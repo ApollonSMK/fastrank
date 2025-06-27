@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Team, Competition, Driver } from "@/lib/data-types";
 import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers } from "@/lib/data-service";
-import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon } from "lucide-react";
+import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,6 +65,20 @@ const competitionFormSchema = z.object({
   rewardType: z.enum(['points', 'money'], { required_error: "O tipo de prémio é obrigatório."}),
   rewardAmount: z.coerce.number().min(1, { message: "O valor do prémio deve ser positivo."}),
 });
+
+const StatisticsManagement = () => {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Estatísticas Gerais</CardTitle>
+        <p className="text-sm text-muted-foreground pt-1.5">Visão geral do desempenho da frota.</p>
+      </CardHeader>
+      <CardContent>
+        <p className="text-center text-muted-foreground py-8">O conteúdo das estatísticas será adicionado aqui em breve.</p>
+      </CardContent>
+    </Card>
+  );
+};
 
 
 const TeamsManagement = () => {
@@ -476,11 +490,15 @@ export default function AdminPage() {
   return (
     <>
         <h2 className="font-headline text-2xl font-bold">Painel de Admin</h2>
-        <Tabs defaultValue="teams" className="space-y-4">
+        <Tabs defaultValue="statistics" className="space-y-4">
             <TabsList>
+                <TabsTrigger value="statistics"><BarChart className="mr-2 h-4 w-4" /> Estatísticas</TabsTrigger>
                 <TabsTrigger value="teams"><Users className="mr-2 h-4 w-4" /> Equipas</TabsTrigger>
                 <TabsTrigger value="competitions"><Swords className="mr-2 h-4 w-4" /> Competições</TabsTrigger>
             </TabsList>
+            <TabsContent value="statistics">
+                <StatisticsManagement />
+            </TabsContent>
             <TabsContent value="teams">
                 <TeamsManagement />
             </TabsContent>
@@ -491,5 +509,3 @@ export default function AdminPage() {
     </>
   );
 }
-
-    
