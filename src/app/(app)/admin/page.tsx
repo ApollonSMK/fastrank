@@ -400,23 +400,8 @@ const VehiclesManagement = () => {
       getAllTeams(),
     ]);
     
-    const teamsMap = new Map(teamsData.map(t => [t.id, t.name]));
-    
-    // Treat "[VEÍCULO LIVRE]" as a special case for sorting, putting them last
-    driversData.sort((a, b) => {
-        const aIsFree = a.name === '[VEÍCULO LIVRE]';
-        const bIsFree = b.name === '[VEÍCULO LIVRE]';
-        if (aIsFree && !bIsFree) return 1;
-        if (!aIsFree && bIsFree) return -1;
-
-        const teamAName = teamsMap.get(a.teamId || '') || 'Ω';
-        const teamBName = teamsMap.get(b.teamId || '') || 'Ω';
-        if (teamAName < teamBName) return -1;
-        if (teamAName > teamBName) return 1;
-        
-        // If they are on the same team (or both free), sort by license plate
-        return a.licensePlate.localeCompare(b.licensePlate);
-    });
+    // Sort by license plate, as requested.
+    driversData.sort((a, b) => a.licensePlate.localeCompare(b.licensePlate));
 
     setVehicles(driversData);
     setTeams(teamsData);
