@@ -56,7 +56,7 @@ const addFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
   licensePlate: z.string().min(1, { message: "A matrícula é obrigatória." }),
   vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
-  email: z.string().email({ message: 'Por favor, insira um email válido.' }),
+  emailUsername: z.string().min(1, { message: 'O nome de utilizador do email é obrigatório.' }),
   password: z.string().min(6, { message: 'A senha deve ter pelo menos 6 caracteres.' }),
 });
 type AddFormValues = z.infer<typeof addFormSchema>;
@@ -120,7 +120,7 @@ export default function TeamDetailsPage() {
       name: "",
       licensePlate: "",
       vehicleModel: "",
-      email: "",
+      emailUsername: "",
       password: "",
     },
   });
@@ -174,7 +174,7 @@ export default function TeamDetailsPage() {
     // The admin will need to log back in.
     const newDriver: Omit<Driver, 'id'> = {
       name: data.name,
-      email: data.email,
+      email: `${data.emailUsername}@fastrack.lu`,
       licensePlate: data.licensePlate.toUpperCase(),
       vehicleModel: data.vehicleModel,
       teamId: team.id,
@@ -372,7 +372,7 @@ export default function TeamDetailsPage() {
                     <FormItem>
                       <FormLabel>Matrícula</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ex: LU 12345" {...field} />
+                        <Input placeholder="Ex: LU12345" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -393,12 +393,15 @@ export default function TeamDetailsPage() {
                 />
                 <FormField
                   control={addForm.control}
-                  name="email"
+                  name="emailUsername"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="Ex: joao.silva@empresa.com" {...field} />
+                       <FormControl>
+                        <div className="flex items-center gap-2">
+                          <Input placeholder="joao.silva" {...field} />
+                          <span className="text-muted-foreground">@fastrack.lu</span>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
