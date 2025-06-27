@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Team, Competition, Driver, FleetChangeLog } from "@/lib/data-types";
+import { Team, Competition, Driver, FleetChangeLog, VehicleHistoryEntry } from "@/lib/data-types";
 import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition, getFleetChangeLog, updateDriver, getDriver, deleteDriver, addFleetChangeLog, addFreeVehicle } from "@/lib/data-service";
 import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart, Trash2, Car, FileDown, Contact, History, Edit } from "lucide-react";
 import {
@@ -80,8 +80,7 @@ const competitionFormSchema = z.object({
 
 const editDriverFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
-  licensePlate: z.string().min(1, { message: "A matrícula é obrigatória." }),
-  vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
+  vehicleId: z.string().min(1, { message: "É obrigatório selecionar um veículo." }),
   teamId: z.string().optional(),
 });
 type EditDriverFormValues = z.infer<typeof editDriverFormSchema>;
@@ -111,7 +110,7 @@ const DriversManagement = () => {
     const router = useRouter();
     const [drivers, setDrivers] = useState<Driver[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
-    const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
+    const [freeVehicles, setFreeVehicles] = useState<Driver[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const [driverToEdit, setDriverToEdit] = useState<Driver | null>(null);
@@ -126,8 +125,10 @@ const DriversManagement = () => {
             getAllTeams(),
         ]);
         const activeDrivers = driversData.filter(d => d.name !== '[VEÍCULO LIVRE]');
+        const freeVehiclesData = driversData.filter(d => d.name === '[VEÍCULO LIVRE]');
+
         setDrivers(activeDrivers.sort((a,b) => a.name.localeCompare(b.name)));
-        setAllDrivers(driversData); // Store all for validation
+        setFreeVehicles(freeVehiclesData);
         setTeams(teamsData);
         setIsLoading(false);
     }, []);
@@ -144,8 +145,7 @@ const DriversManagement = () => {
         setDriverToEdit(driver);
         editForm.reset({
             name: driver.name,
-            licensePlate: driver.licensePlate,
-            vehicleModel: driver.vehicleModel,
+            vehicleId: driver.id,
             teamId: driver.teamId || 'none',
         });
         setIsEditDialogOpen(true);
@@ -167,78 +167,94 @@ const DriversManagement = () => {
     const onUpdateSubmit: SubmitHandler<EditDriverFormValues> = async (data) => {
         if (!driverToEdit) return;
 
-        const newPlate = data.licensePlate.toUpperCase();
-        if (newPlate !== driverToEdit.licensePlate.toUpperCase()) {
-            const plateExists = allDrivers.some(driver =>
-                driver.id !== driverToEdit.id &&
-                driver.licensePlate.toUpperCase() === newPlate
-            );
-            if (plateExists) {
-                editForm.setError("licensePlate", {
-                    type: "manual",
-                    message: "Esta matrícula já está a ser utilizada por outro motorista."
-                });
+        const newTeamId = data.teamId === 'none' ? '' : data.teamId;
+
+        // Case 1: Vehicle was NOT changed, just update other details
+        if (data.vehicleId === driverToEdit.id) {
+            const updates: Partial<Driver> = {};
+            const changeDescriptions: string[] = [];
+            
+            const currentDriver = await getDriver(driverToEdit.id);
+            if (!currentDriver) return;
+
+            if (currentDriver.name !== data.name) {
+                updates.name = data.name;
+                changeDescriptions.push(`Nome alterado de "${currentDriver.name}" para "${data.name}".`);
+            }
+            if (currentDriver.teamId !== newTeamId) {
+                updates.teamId = newTeamId;
+                const currentTeamName = teams.find(t => t.id === currentDriver.teamId)?.name || 'Sem Equipa';
+                const newTeamName = teams.find(t => t.id === newTeamId)?.name || 'Sem Equipa';
+                changeDescriptions.push(`Equipa alterada de "${currentTeamName}" para "${newTeamName}".`);
+            }
+
+            if (Object.keys(updates).length > 0) {
+                await updateDriver(driverToEdit.id, updates);
+                if (changeDescriptions.length > 0) {
+                     await addFleetChangeLog({
+                        driverId: driverToEdit.id,
+                        driverName: data.name,
+                        changeDescription: changeDescriptions.join(' ')
+                    });
+                }
+            }
+        } else {
+            // Case 2: Vehicle WAS changed. This requires moving driver data.
+            const oldVehicleDoc = await getDriver(driverToEdit.id);
+            const newVehicleDoc = await getDriver(data.vehicleId);
+
+            if (!oldVehicleDoc || !newVehicleDoc || newVehicleDoc.name !== '[VEÍCULO LIVRE]') {
+                console.error("Invalid vehicle swap operation.");
+                // TODO: Add user-facing error (toast)
                 return;
             }
-        }
 
-        const currentDriver = await getDriver(driverToEdit.id);
-        if (!currentDriver) return;
+            // Move all driver-specific data from old vehicle doc to new one
+            const updatesForNewVehicle: Partial<Driver> = {
+                authUid: oldVehicleDoc.authUid,
+                name: data.name,
+                email: oldVehicleDoc.email,
+                avatar: oldVehicleDoc.avatar,
+                rank: oldVehicleDoc.rank,
+                points: oldVehicleDoc.points,
+                moneyBalance: oldVehicleDoc.moneyBalance,
+                trips: oldVehicleDoc.trips,
+                safetyScore: oldVehicleDoc.safetyScore,
+                efficiency: oldVehicleDoc.efficiency,
+                teamId: newTeamId,
+                dailyDeliveries: oldVehicleDoc.dailyDeliveries,
+                achievementIds: oldVehicleDoc.achievementIds,
+                notifications: oldVehicleDoc.notifications,
+                // licensePlateHistory is NOT moved, as it belongs to the vehicle entity.
+            };
 
-        const newTeamId = data.teamId === 'none' ? '' : data.teamId;
-        const nameChanged = currentDriver.name !== data.name;
-        const plateChanged = currentDriver.licensePlate.toUpperCase() !== data.licensePlate.toUpperCase();
-        const modelChanged = currentDriver.vehicleModel !== data.vehicleModel;
-        const teamChanged = currentDriver.teamId !== newTeamId;
-
-        if (!nameChanged && !plateChanged && !modelChanged && !teamChanged) {
-            setIsEditDialogOpen(false);
-            setDriverToEdit(null);
-            return;
-        }
-
-        const updates: Partial<Driver> = {
-            name: data.name,
-            licensePlate: data.licensePlate.toUpperCase(),
-            vehicleModel: data.vehicleModel,
-            teamId: newTeamId,
-        };
-        
-        const changeDescriptions: string[] = [];
-
-        if (plateChanged || modelChanged) {
-            const updatedHistory = [...(currentDriver.licensePlateHistory || [])];
-            const lastEntry = updatedHistory.find(entry => entry.unassignedDate === null);
+            // Reset the old vehicle to be free
+            const updatesForOldVehicle: Partial<Driver> = {
+                 name: '[VEÍCULO LIVRE]',
+                 email: '',
+                 authUid: null,
+                 teamId: '',
+                 avatar: '/avatars/default.png',
+                 rank: 999,
+                 points: 0,
+                 moneyBalance: 0,
+                 trips: 0,
+                 safetyScore: 100,
+                 efficiency: 100,
+                 dailyDeliveries: [],
+                 notifications: [],
+                 achievementIds: [],
+            };
             
-            if (lastEntry) {
-                lastEntry.unassignedDate = new Date().toISOString();
-            }
+            await Promise.all([
+                updateDriver(newVehicleDoc.id, updatesForNewVehicle),
+                updateDriver(oldVehicleDoc.id, updatesForOldVehicle),
+            ]);
 
-            updatedHistory.push({
-                licensePlate: data.licensePlate.toUpperCase(),
-                vehicleModel: data.vehicleModel,
-                assignedDate: new Date().toISOString(),
-                unassignedDate: null,
-            });
-            updates.licensePlateHistory = updatedHistory;
-        }
-        
-        if (nameChanged) changeDescriptions.push(`Nome alterado de "${currentDriver.name}" para "${data.name}".`);
-        if (plateChanged) changeDescriptions.push(`Matrícula alterada de "${currentDriver.licensePlate}" para "${data.licensePlate.toUpperCase()}".`);
-        if (modelChanged) changeDescriptions.push(`Modelo do veículo alterado de "${currentDriver.vehicleModel}" para "${data.vehicleModel}".`);
-        if(teamChanged) {
-            const currentTeamName = teams.find(t => t.id === currentDriver.teamId)?.name || 'Sem Equipa';
-            const newTeamName = teams.find(t => t.id === newTeamId)?.name || 'Sem Equipa';
-            changeDescriptions.push(`Equipa alterada de "${currentTeamName}" para "${newTeamName}".`);
-        }
-
-        await updateDriver(driverToEdit.id, updates);
-
-        if (changeDescriptions.length > 0) {
             await addFleetChangeLog({
-                driverId: driverToEdit.id,
+                driverId: newVehicleDoc.id, // Log against the new document ID
                 driverName: data.name,
-                changeDescription: changeDescriptions.join(' ')
+                changeDescription: `Motorista ${data.name} transferido do veículo ${oldVehicleDoc.licensePlate} para ${newVehicleDoc.licensePlate}.`
             });
         }
 
@@ -339,24 +355,25 @@ const DriversManagement = () => {
                                 <FormMessage />
                             </FormItem>
                         )} />
-                        <FormField control={editForm.control} name="licensePlate" render={({ field }) => (
+                        <FormField control={editForm.control} name="vehicleId" render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Matrícula</FormLabel>
-                                <FormControl><Input {...field} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
-                        <FormField control={editForm.control} name="vehicleModel" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Modelo do Veículo</FormLabel>
-                                <FormControl><Input {...field} /></FormControl>
+                                <FormLabel>Veículo</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger><SelectValue placeholder="Selecione um veículo" /></SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {driverToEdit && <SelectItem key={driverToEdit.id} value={driverToEdit.id}>{`${driverToEdit.licensePlate} - ${driverToEdit.vehicleModel} (Atual)`}</SelectItem>}
+                                        {freeVehicles.map(v => <SelectItem key={v.id} value={v.id}>{`${v.licensePlate} - ${v.vehicleModel}`}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
                                 <FormMessage />
                             </FormItem>
                         )} />
                          <FormField control={editForm.control} name="teamId" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Equipa</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Selecione a equipa" /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         <SelectItem value="none">Sem Equipa</SelectItem>
@@ -452,10 +469,19 @@ const VehiclesManagement = () => {
     
     doc.text(`Lista de Veículos e Motoristas - ${today}`, 14, 16);
 
+    const sortedVehicles = [...vehicles].sort((a, b) => {
+        const teamA = teamsMap.get(a.teamId || '') || 'zzz'; // place no team at the end
+        const teamB = teamsMap.get(b.teamId || '') || 'zzz';
+        if (teamA < teamB) return -1;
+        if (teamA > teamB) return 1;
+        return a.licensePlate.localeCompare(b.licensePlate);
+    });
+
+
     (autoTable as any)(doc, {
         startY: 20,
         head: [['Matrícula', 'Modelo do Veículo', 'Motorista', 'Equipa']],
-        body: vehicles.map(vehicle => {
+        body: sortedVehicles.map(vehicle => {
            const isAssigned = vehicle.name !== '[VEÍCULO LIVRE]';
            const driverName = isAssigned ? vehicle.name : 'Livre';
            const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'Sem Equipa') : 'N/A';
@@ -495,6 +521,14 @@ const VehiclesManagement = () => {
   };
 
   const teamsMap = new Map(teams.map(t => [t.id, t.name]));
+  const sortedVehicles = [...vehicles].sort((a, b) => {
+        const teamA = teamsMap.get(a.teamId || '') || 'zzz';
+        const teamB = teamsMap.get(b.teamId || '') || 'zzz';
+        if (teamA < teamB) return -1;
+        if (teamA > teamB) return 1;
+        return a.licensePlate.localeCompare(b.licensePlate);
+    });
+
 
   return (
     <>
@@ -582,7 +616,7 @@ const VehiclesManagement = () => {
                                     </TableRow>
                                 ))
                             ) : (
-                                vehicles.map((vehicle) => {
+                                sortedVehicles.map((vehicle) => {
                                     const isAssigned = vehicle.name !== '[VEÍCULO LIVRE]';
                                     const driverName = isAssigned ? vehicle.name : 'Livre';
                                     const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'Sem Equipa') : 'N/A';
@@ -1117,3 +1151,5 @@ export default function AdminPage() {
     </>
   );
 }
+
+    
