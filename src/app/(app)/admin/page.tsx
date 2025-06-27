@@ -227,7 +227,10 @@ const DriversManagement = () => {
         <>
         <Card>
             <CardHeader>
-                <CardTitle>Todos os Motoristas</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                    <span>Todos os Motoristas</span>
+                     {!isLoading && <Badge variant="outline">{drivers.length} Total</Badge>}
+                </CardTitle>
                 <p className="text-sm text-muted-foreground pt-1.5">Consulte e gira todos os motoristas registados.</p>
             </CardHeader>
             <CardContent>
