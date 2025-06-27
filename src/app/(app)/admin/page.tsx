@@ -94,16 +94,30 @@ const StatisticsManagement = () => {
 
 const VehiclesManagement = () => {
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [changeLog, setChangeLog] = useState<FleetChangeLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
-    const [driversData, logData] = await Promise.all([
+    const [driversData, logData, teamsData] = await Promise.all([
       getAllDrivers(),
       getFleetChangeLog(),
+      getAllTeams(),
     ]);
-    setDrivers(driversData.sort((a,b) => a.name.localeCompare(b.name)));
+    
+    const teamsMap = new Map(teamsData.map(t => [t.id, t.name]));
+    
+    driversData.sort((a, b) => {
+        const teamAName = teamsMap.get(a.teamId || '') || 'Ω'; // Use a character that sorts last for drivers without a team
+        const teamBName = teamsMap.get(b.teamId || '') || 'Ω';
+        if (teamAName < teamBName) return -1;
+        if (teamAName > teamBName) return 1;
+        return a.name.localeCompare(b.name);
+    });
+
+    setDrivers(driversData);
+    setTeams(teamsData);
     setChangeLog(logData);
     setIsLoading(false);
   }, []);
@@ -115,16 +129,18 @@ const VehiclesManagement = () => {
   const handleExportFleetPDF = () => {
     const doc = new jsPDF();
     const today = format(new Date(), "dd/MM/yyyy");
+    const teamsMap = new Map(teams.map(t => [t.id, t.name]));
     
     doc.text(`Lista de Veículos e Motoristas - ${today}`, 14, 16);
 
     (autoTable as any)(doc, {
         startY: 20,
-        head: [['Modelo do Veículo', 'Matrícula', 'Motorista']],
+        head: [['Matrícula', 'Modelo do Veículo', 'Motorista', 'Equipa']],
         body: drivers.map(driver => [
-            driver.vehicleModel,
             driver.licensePlate,
-            driver.name
+            driver.vehicleModel,
+            driver.name,
+            teamsMap.get(driver.teamId || '') || 'Sem Equipa'
         ]),
         headStyles: { fillColor: [45, 100, 51] },
         theme: 'striped',
@@ -176,28 +192,34 @@ const VehiclesManagement = () => {
                      <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Modelo do Veículo</TableHead>
                             <TableHead>Matrícula</TableHead>
+                            <TableHead>Modelo do Veículo</TableHead>
                             <TableHead>Motorista</TableHead>
+                            <TableHead>Equipa</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
                                 [...Array(5)].map((_, i) => (
                                     <TableRow key={i}>
-                                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                                         <TableCell><Skeleton className="h-5 w-36" /></TableCell>
+                                        <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                                     </TableRow>
                                 ))
                             ) : (
-                                drivers.map((driver) => (
-                                    <TableRow key={driver.id}>
-                                        <TableCell>{driver.vehicleModel}</TableCell>
-                                        <TableCell>{driver.licensePlate}</TableCell>
-                                        <TableCell className="font-medium">{driver.name}</TableCell>
-                                    </TableRow>
-                                ))
+                                drivers.map((driver) => {
+                                    const team = teams.find(t => t.id === driver.teamId);
+                                    return (
+                                        <TableRow key={driver.id}>
+                                            <TableCell>{driver.licensePlate}</TableCell>
+                                            <TableCell>{driver.vehicleModel}</TableCell>
+                                            <TableCell className="font-medium">{driver.name}</TableCell>
+                                            <TableCell>{team?.name || 'Sem Equipa'}</TableCell>
+                                        </TableRow>
+                                    )
+                                })
                             )}
                         </TableBody>
                       </Table>
