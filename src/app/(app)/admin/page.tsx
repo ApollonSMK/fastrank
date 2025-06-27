@@ -211,20 +211,20 @@ const DriversManagement = () => {
 
             // Move all driver-specific data from old vehicle doc to new one
             const updatesForNewVehicle: Partial<Driver> = {
-                authUid: oldVehicleDoc.authUid,
+                authUid: oldVehicleDoc.authUid || null,
                 name: data.name,
-                email: oldVehicleDoc.email,
-                avatar: oldVehicleDoc.avatar,
-                rank: oldVehicleDoc.rank,
-                points: oldVehicleDoc.points,
-                moneyBalance: oldVehicleDoc.moneyBalance,
-                trips: oldVehicleDoc.trips,
-                safetyScore: oldVehicleDoc.safetyScore,
-                efficiency: oldVehicleDoc.efficiency,
+                email: oldVehicleDoc.email || '',
+                avatar: oldVehicleDoc.avatar || '/avatars/default.png',
+                rank: oldVehicleDoc.rank ?? 999,
+                points: oldVehicleDoc.points ?? 0,
+                moneyBalance: oldVehicleDoc.moneyBalance ?? 0,
+                trips: oldVehicleDoc.trips ?? 0,
+                safetyScore: oldVehicleDoc.safetyScore ?? 100,
+                efficiency: oldVehicleDoc.efficiency ?? 100,
                 teamId: newTeamId,
-                dailyDeliveries: oldVehicleDoc.dailyDeliveries,
-                achievementIds: oldVehicleDoc.achievementIds,
-                notifications: oldVehicleDoc.notifications,
+                dailyDeliveries: oldVehicleDoc.dailyDeliveries || [],
+                achievementIds: oldVehicleDoc.achievementIds || [],
+                notifications: oldVehicleDoc.notifications || [],
                 // licensePlateHistory is NOT moved, as it belongs to the vehicle entity.
             };
 
