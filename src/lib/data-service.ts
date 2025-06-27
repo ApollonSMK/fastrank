@@ -102,18 +102,46 @@ export async function addDriver(driverData: Omit<Driver, 'id'>, password: string
 }
 
 export async function deleteDriver(id: string) {
-    // Note: This only deletes the Firestore record, not the Firebase Auth user.
-    // Deleting an auth user requires admin privileges or re-authentication,
-    // which is better handled in a server environment.
+    // This function doesn't actually delete the driver, but rather converts them
+    // into a "Free Vehicle" by clearing personal data but keeping vehicle data.
+    // The associated Firebase Auth user is not touched.
     const driverToDelete = await getDriver(id);
-    if(driverToDelete) {
+    if (!driverToDelete) return;
+    
+    if (driverToDelete.name === '[VEÍCULO LIVRE]') {
+        // If it's already a free vehicle, delete it permanently.
+        await addFleetChangeLog({
+            driverId: id,
+            driverName: '[VEÍCULO LIVRE]',
+            changeDescription: `Veículo ${driverToDelete.licensePlate} removido permanentemente.`
+        });
+        await deleteDoc(doc(db, 'drivers', id));
+    } else {
+        // If it's an active driver, convert them to a free vehicle.
+        const updates = {
+            name: '[VEÍCULO LIVRE]',
+            email: `deleted-${id}@fastrack.lu`, // Placeholder to avoid conflicts
+            teamId: '',
+            avatar: '/avatars/default.png',
+            rank: 999,
+            points: 0,
+            moneyBalance: 0,
+            trips: 0,
+            safetyScore: 100,
+            efficiency: 100,
+            dailyDeliveries: [],
+            notifications: [],
+            achievementIds: [],
+        };
+        
+        await updateDoc(doc(db, 'drivers', id), updates);
+
         await addFleetChangeLog({
             driverId: id,
             driverName: driverToDelete.name,
-            changeDescription: `Motorista removido: ${driverToDelete.name}.`
+            changeDescription: `Motorista "${driverToDelete.name}" removido. Veículo ${driverToDelete.licensePlate} ficou livre.`
         });
     }
-    await deleteDoc(doc(db, 'drivers', id));
 }
 
 // --- Team Functions ---
@@ -227,6 +255,10 @@ export async function getLoggedInDriver(): Promise<Driver | null> {
     if (user) {
         try {
             const driver = await getDriver(user.uid);
+            // Don't return anything if the user is a "free vehicle" placeholder
+            if (driver && driver.name === '[VEÍCULO LIVRE]') {
+                return null;
+            }
             return driver;
         } catch (error) {
             console.error("Error fetching driver data for logged in user:", error);

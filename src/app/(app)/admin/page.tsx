@@ -104,6 +104,7 @@ const DriversManagement = () => {
     const router = useRouter();
     const [drivers, setDrivers] = useState<Driver[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
+    const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const [driverToEdit, setDriverToEdit] = useState<Driver | null>(null);
@@ -117,7 +118,9 @@ const DriversManagement = () => {
             getAllDrivers(),
             getAllTeams(),
         ]);
-        setDrivers(driversData.sort((a,b) => a.name.localeCompare(b.name)));
+        const activeDrivers = driversData.filter(d => d.name !== '[VEÍCULO LIVRE]');
+        setDrivers(activeDrivers.sort((a,b) => a.name.localeCompare(b.name)));
+        setAllDrivers(driversData); // Store all for validation
         setTeams(teamsData);
         setIsLoading(false);
     }, []);
@@ -159,7 +162,7 @@ const DriversManagement = () => {
 
         const newPlate = data.licensePlate.toUpperCase();
         if (newPlate !== driverToEdit.licensePlate.toUpperCase()) {
-            const plateExists = drivers.some(driver =>
+            const plateExists = allDrivers.some(driver =>
                 driver.id !== driverToEdit.id &&
                 driver.licensePlate.toUpperCase() === newPlate
             );
@@ -369,7 +372,7 @@ const DriversManagement = () => {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Tem a certeza?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Isto irá remover permanentemente o motorista "{driverToDelete?.name}".
+                        Esta ação irá remover o motorista "{driverToDelete?.name}". O veículo associado ({driverToDelete?.licensePlate}) ficará livre.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -384,7 +387,7 @@ const DriversManagement = () => {
 
 
 const VehiclesManagement = () => {
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [vehicles, setVehicles] = useState<Driver[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [changeLog, setChangeLog] = useState<FleetChangeLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -399,15 +402,23 @@ const VehiclesManagement = () => {
     
     const teamsMap = new Map(teamsData.map(t => [t.id, t.name]));
     
+    // Treat "[VEÍCULO LIVRE]" as a special case for sorting, putting them last
     driversData.sort((a, b) => {
-        const teamAName = teamsMap.get(a.teamId || '') || 'Ω'; // Use a character that sorts last for drivers without a team
+        const aIsFree = a.name === '[VEÍCULO LIVRE]';
+        const bIsFree = b.name === '[VEÍCULO LIVRE]';
+        if (aIsFree && !bIsFree) return 1;
+        if (!aIsFree && bIsFree) return -1;
+
+        const teamAName = teamsMap.get(a.teamId || '') || 'Ω';
         const teamBName = teamsMap.get(b.teamId || '') || 'Ω';
         if (teamAName < teamBName) return -1;
         if (teamAName > teamBName) return 1;
-        return a.name.localeCompare(b.name);
+        
+        // If they are on the same team (or both free), sort by license plate
+        return a.licensePlate.localeCompare(b.licensePlate);
     });
 
-    setDrivers(driversData);
+    setVehicles(driversData);
     setTeams(teamsData);
     setChangeLog(logData);
     setIsLoading(false);
@@ -427,12 +438,17 @@ const VehiclesManagement = () => {
     (autoTable as any)(doc, {
         startY: 20,
         head: [['Matrícula', 'Modelo do Veículo', 'Motorista', 'Equipa']],
-        body: drivers.map(driver => [
-            driver.licensePlate,
-            driver.vehicleModel,
-            driver.name,
-            teamsMap.get(driver.teamId || '') || 'Sem Equipa'
-        ]),
+        body: vehicles.map(vehicle => {
+           const isAssigned = vehicle.name !== '[VEÍCULO LIVRE]';
+           const driverName = isAssigned ? vehicle.name : 'Livre';
+           const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'Sem Equipa') : 'N/A';
+           return [
+                vehicle.licensePlate,
+                vehicle.vehicleModel,
+                driverName,
+                teamName
+           ]
+        }),
         headStyles: { fillColor: [45, 100, 51] },
         theme: 'striped',
     });
@@ -461,6 +477,8 @@ const VehiclesManagement = () => {
     doc.save(`historico_frota_${today.replace(/\//g, '-')}.pdf`);
   };
 
+  const teamsMap = new Map(teams.map(t => [t.id, t.name]));
+
   return (
     <Card>
         <CardHeader>
@@ -475,7 +493,7 @@ const VehiclesManagement = () => {
                 </TabsList>
                 <TabsContent value="current" className="mt-4">
                     <div className="flex justify-end mb-4">
-                        <Button onClick={handleExportFleetPDF} disabled={isLoading || drivers.length === 0}>
+                        <Button onClick={handleExportFleetPDF} disabled={isLoading || vehicles.length === 0}>
                             <FileDown className="mr-2 h-4 w-4" />
                             Exportar Frota para PDF
                         </Button>
@@ -500,14 +518,16 @@ const VehiclesManagement = () => {
                                     </TableRow>
                                 ))
                             ) : (
-                                drivers.map((driver) => {
-                                    const team = teams.find(t => t.id === driver.teamId);
+                                vehicles.map((vehicle) => {
+                                    const isAssigned = vehicle.name !== '[VEÍCULO LIVRE]';
+                                    const driverName = isAssigned ? vehicle.name : 'Livre';
+                                    const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'Sem Equipa') : 'N/A';
                                     return (
-                                        <TableRow key={driver.id}>
-                                            <TableCell>{driver.licensePlate}</TableCell>
-                                            <TableCell>{driver.vehicleModel}</TableCell>
-                                            <TableCell className="font-medium">{driver.name}</TableCell>
-                                            <TableCell>{team?.name || 'Sem Equipa'}</TableCell>
+                                        <TableRow key={vehicle.id}>
+                                            <TableCell>{vehicle.licensePlate}</TableCell>
+                                            <TableCell>{vehicle.vehicleModel}</TableCell>
+                                            <TableCell className="font-medium">{driverName}</TableCell>
+                                            <TableCell>{teamName}</TableCell>
                                         </TableRow>
                                     )
                                 })
@@ -578,7 +598,7 @@ const TeamsManagement = () => {
   }, [fetchData]);
 
   const getTeamMemberCount = (teamId: string) => {
-    return drivers.filter(driver => driver.teamId === teamId).length;
+    return drivers.filter(driver => driver.teamId === teamId && driver.name !== '[VEÍCULO LIVRE]').length;
   }
 
   const handleRowClick = (teamId: string) => {
