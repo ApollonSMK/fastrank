@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, ArrowLeft, MoreVertical, Trash2, Calendar as CalendarIcon } from 'lucide-react';
+import { PlusCircle, ArrowLeft, MoreVertical, Trash2, Calendar as CalendarIcon, Edit } from 'lucide-react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -52,15 +52,21 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Skeleton } from '@/components/ui/skeleton';
 
-const FormSchema = z.object({
+const addFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
   licensePlate: z.string().min(1, { message: "A matrícula é obrigatória." }),
   vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
   email: z.string().email({ message: 'Por favor, insira um email válido.' }),
   password: z.string().min(6, { message: 'A senha deve ter pelo menos 6 caracteres.' }),
 });
+type AddFormValues = z.infer<typeof addFormSchema>;
 
-type FormValues = z.infer<typeof FormSchema>;
+const editFormSchema = z.object({
+  name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
+  licensePlate: z.string().min(1, { message: "A matrícula é obrigatória." }),
+  vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
+});
+type EditFormValues = z.infer<typeof editFormSchema>;
 
 const deliveryFormSchema = z.object({
   date: z.date({ required_error: "A data é obrigatória." }),
@@ -87,6 +93,9 @@ export default function TeamDetailsPage() {
   const [isDeliveriesDialogOpen, setIsDeliveriesDialogOpen] = useState(false);
   const [selectedDriverForDeliveries, setSelectedDriverForDeliveries] = useState<Driver | null>(null);
 
+  const [driverToEdit, setDriverToEdit] = useState<Driver | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
   const fetchData = useCallback(async () => {
     if (!teamId) return;
     setIsLoading(true);
@@ -105,8 +114,8 @@ export default function TeamDetailsPage() {
     fetchData();
   }, [fetchData]);
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(FormSchema),
+  const addForm = useForm<AddFormValues>({
+    resolver: zodResolver(addFormSchema),
     defaultValues: {
       name: "",
       licensePlate: "",
@@ -114,6 +123,10 @@ export default function TeamDetailsPage() {
       email: "",
       password: "",
     },
+  });
+
+  const editForm = useForm<EditFormValues>({
+    resolver: zodResolver(editFormSchema),
   });
 
   const deliveryForm = useForm<DeliveryFormValues>({
@@ -155,7 +168,7 @@ export default function TeamDetailsPage() {
     return <div>Equipa não encontrada</div>;
   }
 
-  const onSubmit: SubmitHandler<FormValues> = async (data) => {
+  const onAddSubmit: SubmitHandler<AddFormValues> = async (data) => {
     // Note: creating a user via the admin panel will sign the admin out
     // and sign the new user in. This is a limitation of the Firebase client SDK.
     // The admin will need to log back in.
@@ -178,7 +191,19 @@ export default function TeamDetailsPage() {
     };
 
     await addDriver(newDriver, data.password);
-    form.reset();
+    addForm.reset();
+    fetchData();
+  };
+
+  const onUpdateSubmit: SubmitHandler<EditFormValues> = async (data) => {
+    if (!driverToEdit) return;
+    await updateDriver(driverToEdit.id, {
+        name: data.name,
+        licensePlate: data.licensePlate.toUpperCase(),
+        vehicleModel: data.vehicleModel,
+    });
+    setIsEditDialogOpen(false);
+    setDriverToEdit(null);
     fetchData();
   };
 
@@ -195,6 +220,16 @@ export default function TeamDetailsPage() {
   const openDeliveriesDialog = (driver: Driver) => {
     setSelectedDriverForDeliveries(driver);
     setIsDeliveriesDialogOpen(true);
+  };
+  
+  const openEditDialog = (driver: Driver) => {
+    setDriverToEdit(driver);
+    editForm.reset({
+        name: driver.name,
+        licensePlate: driver.licensePlate,
+        vehicleModel: driver.vehicleModel,
+    });
+    setIsEditDialogOpen(true);
   };
 
   const handleDeleteDriver = async () => {
@@ -315,10 +350,10 @@ export default function TeamDetailsPage() {
             <CardDescription>Crie um novo motorista e adicione-o a esta equipa.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <Form {...addForm}>
+              <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
                 <FormField
-                  control={form.control}
+                  control={addForm.control}
                   name="name"
                   render={({ field }) => (
                     <FormItem>
@@ -331,7 +366,7 @@ export default function TeamDetailsPage() {
                   )}
                 />
                 <FormField
-                  control={form.control}
+                  control={addForm.control}
                   name="licensePlate"
                   render={({ field }) => (
                     <FormItem>
@@ -344,7 +379,7 @@ export default function TeamDetailsPage() {
                   )}
                 />
                  <FormField
-                  control={form.control}
+                  control={addForm.control}
                   name="vehicleModel"
                   render={({ field }) => (
                     <FormItem>
@@ -357,7 +392,7 @@ export default function TeamDetailsPage() {
                   )}
                 />
                 <FormField
-                  control={form.control}
+                  control={addForm.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem>
@@ -370,7 +405,7 @@ export default function TeamDetailsPage() {
                   )}
                 />
                 <FormField
-                  control={form.control}
+                  control={addForm.control}
                   name="password"
                   render={({ field }) => (
                     <FormItem>
@@ -382,7 +417,7 @@ export default function TeamDetailsPage() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={form.formState.isSubmitting}>
+                <Button type="submit" disabled={addForm.formState.isSubmitting}>
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Adicionar Membro
                 </Button>
@@ -420,13 +455,20 @@ export default function TeamDetailsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditDialog(member)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openDeliveriesDialog(member)}>
+                              <CalendarIcon className="mr-2 h-4 w-4" />
                               Gerir Entregas
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openTransferDialog(member)}>
+                              <ArrowLeft className="mr-2 h-4 w-4" />
                               Transferir
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openDeleteDialog(member)} className="text-destructive">
+                              <Trash2 className="mr-2 h-4 w-4" />
                               Remover
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -498,6 +540,67 @@ export default function TeamDetailsPage() {
         </DialogContent>
       </Dialog>
       
+       <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
+        setIsEditDialogOpen(isOpen);
+        if (!isOpen) setDriverToEdit(null);
+      }}>
+        <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Membro: {driverToEdit?.name}</DialogTitle>
+              <DialogDescription>
+                Atualize os detalhes do motorista. O email não pode ser alterado.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...editForm}>
+                <form onSubmit={editForm.handleSubmit(onUpdateSubmit)} className="space-y-4 py-4">
+                     <FormField
+                        control={editForm.control}
+                        name="name"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Nome</FormLabel>
+                            <FormControl>
+                                <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={editForm.control}
+                        name="licensePlate"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Matrícula</FormLabel>
+                            <FormControl>
+                                <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={editForm.control}
+                        name="vehicleModel"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Modelo do Veículo</FormLabel>
+                            <FormControl>
+                                <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                    <DialogFooter>
+                        <Button variant="outline" type="button" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
+                        <Button type="submit" disabled={editForm.formState.isSubmitting}>Guardar Alterações</Button>
+                    </DialogFooter>
+                </form>
+            </Form>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isDeliveriesDialogOpen} onOpenChange={(isOpen) => {
         setIsDeliveriesDialogOpen(isOpen);
         if (!isOpen) {
