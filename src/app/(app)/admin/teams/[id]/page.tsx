@@ -202,15 +202,32 @@ export default function TeamDetailsPage() {
     const currentDriver = await getDriver(driverToEdit.id);
     if (!currentDriver) return;
 
+    const nameChanged = currentDriver.name !== data.name;
     const plateChanged = currentDriver.licensePlate.toUpperCase() !== data.licensePlate.toUpperCase();
     const modelChanged = currentDriver.vehicleModel !== data.vehicleModel;
 
+    // No changes, just close the dialog
+    if (!nameChanged && !plateChanged && !modelChanged) {
+        setIsEditDialogOpen(false);
+        setDriverToEdit(null);
+        return;
+    }
+
+    const updates: Partial<Driver> = {
+      name: data.name,
+      licensePlate: data.licensePlate.toUpperCase(),
+      vehicleModel: data.vehicleModel,
+    };
+    
+    const changeDescriptions: string[] = [];
+
+    // Handle vehicle history update if plate or model changed
     if (plateChanged || modelChanged) {
         const updatedHistory = [...(currentDriver.licensePlateHistory || [])];
-        const lastEntryIndex = updatedHistory.findIndex(entry => entry.unassignedDate === null);
+        const lastEntry = updatedHistory.find(entry => entry.unassignedDate === null);
         
-        if (lastEntryIndex > -1) {
-            updatedHistory[lastEntryIndex].unassignedDate = new Date().toISOString();
+        if (lastEntry) {
+            lastEntry.unassignedDate = new Date().toISOString();
         }
 
         updatedHistory.push({
@@ -219,26 +236,28 @@ export default function TeamDetailsPage() {
             assignedDate: new Date().toISOString(),
             unassignedDate: null,
         });
+        updates.licensePlateHistory = updatedHistory;
+    }
+    
+    if (nameChanged) {
+        changeDescriptions.push(`Nome alterado de "${currentDriver.name}" para "${data.name}".`);
+    }
+    if (plateChanged) {
+        changeDescriptions.push(`Matrícula alterada de "${currentDriver.licensePlate}" para "${data.licensePlate.toUpperCase()}".`);
+    }
+    if (modelChanged) {
+        changeDescriptions.push(`Modelo do veículo alterado de "${currentDriver.vehicleModel}" para "${data.vehicleModel}".`);
+    }
 
-        await updateDriver(driverToEdit.id, {
-            name: data.name,
-            licensePlate: data.licensePlate.toUpperCase(),
-            vehicleModel: data.vehicleModel,
-            licensePlateHistory: updatedHistory
-        });
+    // Update the driver document in Firestore
+    await updateDriver(driverToEdit.id, updates);
 
+    // Add a detailed log entry
+    if (changeDescriptions.length > 0) {
         await addFleetChangeLog({
             driverId: driverToEdit.id,
-            driverName: data.name,
-            changeDescription: `Veículo de ${data.name} atualizado para ${data.vehicleModel} (${data.licensePlate.toUpperCase()}).`
-        });
-
-    } else if (currentDriver.name !== data.name) {
-        await updateDriver(driverToEdit.id, { name: data.name });
-         await addFleetChangeLog({
-            driverId: driverToEdit.id,
-            driverName: data.name,
-            changeDescription: `Nome do motorista alterado de ${currentDriver.name} para ${data.name}.`
+            driverName: data.name, // Use new name for consistency
+            changeDescription: changeDescriptions.join(' ')
         });
     }
 
