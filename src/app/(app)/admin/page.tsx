@@ -169,7 +169,7 @@ const DriversManagement = () => {
 
         const newTeamId = data.teamId === 'none' ? '' : data.teamId;
 
-        // Case 1: Vehicle was NOT changed, just update other details
+        // Case 1: Vehicle was NOT changed.
         if (data.vehicleId === driverToEdit.id) {
             const updates: Partial<Driver> = {};
             const changeDescriptions: string[] = [];
@@ -199,63 +199,73 @@ const DriversManagement = () => {
                 }
             }
         } else {
-            // Case 2: Vehicle WAS changed. This requires a safe, multi-step data swap.
-            const oldVehicleDoc = await getDriver(driverToEdit.id);
-            const newVehicleDoc = await getDriver(data.vehicleId);
+            // Case 2: Vehicle WAS changed. This requires swapping vehicle data, not driver data.
+            const driverDoc = await getDriver(driverToEdit.id);
+            const freeVehicleDoc = await getDriver(data.vehicleId);
 
-            if (!oldVehicleDoc || !newVehicleDoc || newVehicleDoc.name !== '[VEÍCULO LIVRE]') {
+            if (!driverDoc || !freeVehicleDoc || freeVehicleDoc.name !== '[VEÍCULO LIVRE]') {
                 console.error("Invalid vehicle swap operation.");
                 // TODO: Add user-facing error (toast)
                 return;
             }
+            
+            // A. Prepare new vehicle details for the driver
+            const driverNewVehicleInfo = {
+                licensePlate: freeVehicleDoc.licensePlate,
+                vehicleModel: freeVehicleDoc.vehicleModel,
+            };
+            // B. Prepare old vehicle details for the free vehicle doc
+            const freeVehicleNewInfo = {
+                licensePlate: driverDoc.licensePlate,
+                vehicleModel: driverDoc.vehicleModel,
+            };
 
-            // A. Prepare data objects for the swap
-            const driverPersonalData = {
-                authUid: oldVehicleDoc.authUid || null,
+            // C. Update driver's history
+            const driverHistory = [...(driverDoc.licensePlateHistory || [])];
+            const lastDriverEntry = driverHistory.find(entry => entry.unassignedDate === null);
+            if (lastDriverEntry) {
+                lastDriverEntry.unassignedDate = new Date().toISOString();
+            }
+            driverHistory.push({
+                ...driverNewVehicleInfo,
+                assignedDate: new Date().toISOString(),
+                unassignedDate: null,
+            });
+            
+            // D. Update free vehicle's history
+            const freeVehicleHistory = [...(freeVehicleDoc.licensePlateHistory || [])];
+            const lastFreeVehicleEntry = freeVehicleHistory.find(entry => entry.unassignedDate === null);
+            if (lastFreeVehicleEntry) {
+                lastFreeVehicleEntry.unassignedDate = new Date().toISOString();
+            }
+            freeVehicleHistory.push({
+                ...freeVehicleNewInfo,
+                assignedDate: new Date().toISOString(),
+                unassignedDate: null,
+            });
+            
+            // E. Prepare full update objects
+            const driverUpdates: Partial<Driver> = {
                 name: data.name,
-                email: oldVehicleDoc.email || '',
-                avatar: oldVehicleDoc.avatar || '/avatars/default.png',
-                rank: oldVehicleDoc.rank ?? 999,
-                points: oldVehicleDoc.points ?? 0,
-                moneyBalance: oldVehicleDoc.moneyBalance ?? 0,
-                trips: oldVehicleDoc.trips ?? 0,
-                safetyScore: oldVehicleDoc.safetyScore ?? 100,
-                efficiency: oldVehicleDoc.efficiency ?? 100,
                 teamId: newTeamId,
-                dailyDeliveries: oldVehicleDoc.dailyDeliveries || [],
-                achievementIds: oldVehicleDoc.achievementIds || [],
-                notifications: oldVehicleDoc.notifications || [],
+                ...driverNewVehicleInfo,
+                licensePlateHistory: driverHistory,
             };
 
-            const freeVehicleData = {
-                 name: '[VEÍCULO LIVRE]',
-                 email: '',
-                 authUid: null,
-                 teamId: '',
-                 avatar: '/avatars/default.png',
-                 rank: 999,
-                 points: 0,
-                 moneyBalance: 0,
-                 trips: 0,
-                 safetyScore: 100,
-                 efficiency: 100,
-                 dailyDeliveries: [],
-                 notifications: [],
-                 achievementIds: [],
+            const freeVehicleUpdates: Partial<Driver> = {
+                ...freeVehicleNewInfo,
+                licensePlateHistory: freeVehicleHistory,
             };
 
-            // B. Execute updates in a safer sequence
-            // First, copy all personal data to the new vehicle document.
-            await updateDriver(newVehicleDoc.id, driverPersonalData);
-            
-            // Second, fully reset the old vehicle document to become a "Free Vehicle".
-            await updateDriver(oldVehicleDoc.id, freeVehicleData);
-            
-            // C. Log the change
+            // F. Execute the atomic swap
+            await updateDriver(driverDoc.id, driverUpdates);
+            await updateDriver(freeVehicleDoc.id, freeVehicleUpdates);
+
+            // G. Log the change
             await addFleetChangeLog({
-                driverId: newVehicleDoc.id, // Log against the new document ID
+                driverId: driverDoc.id, // Log against the driver's permanent ID
                 driverName: data.name,
-                changeDescription: `Motorista ${data.name} transferido do veículo ${oldVehicleDoc.licensePlate} para ${newVehicleDoc.licensePlate}.`
+                changeDescription: `Motorista ${data.name} transferido do veículo ${freeVehicleNewInfo.licensePlate} para ${driverNewVehicleInfo.licensePlate}.`
             });
         }
 
@@ -1152,5 +1162,7 @@ export default function AdminPage() {
     </>
   );
 }
+
+    
 
     
