@@ -39,6 +39,114 @@ const metricLabels = {
   efficiency: "Eficiência",
 };
 
+const resolveCompletedChallenges = async (currentChallenges: Challenge[], allDrivers: Driver[]): Promise<{ updated: boolean; challenges: Challenge[] }> => {
+    const now = new Date();
+    const challengesToUpdate = currentChallenges.filter(c => c.status === 'active' && parseISO(c.endDate) < now);
+
+    if (challengesToUpdate.length === 0) {
+        return { updated: false, challenges: currentChallenges };
+    }
+
+    const allDriversMap = new Map(allDrivers.map(d => [d.id, d]));
+    const updatedChallenges = [...currentChallenges];
+    const dbUpdatePromises: Promise<any>[] = [];
+
+    for (const challenge of challengesToUpdate) {
+        const challenger = allDriversMap.get(challenge.challengerId);
+        const opponent = allDriversMap.get(challenge.opponentId);
+
+        if (!challenger || !opponent) continue;
+
+        const getScore = (driver: Driver) => {
+            const challengeInterval = { start: parseISO(challenge.startDate), end: parseISO(challenge.endDate) };
+            switch (challenge.metric) {
+                case 'deliveries':
+                    return driver.dailyDeliveries
+                        .filter(d => isWithinInterval(parseISO(d.date), challengeInterval))
+                        .reduce((sum, delivery) => sum + delivery.deliveries, 0);
+                case 'safety': return driver.safetyScore;
+                case 'efficiency': return driver.efficiency;
+                default: return 0;
+            }
+        };
+
+        const challengerScore = getScore(challenger);
+        const opponentScore = getScore(opponent);
+
+        let winner: Driver | null = null;
+        let loser: Driver | null = null;
+        
+        if (challengerScore > opponentScore) {
+            winner = challenger;
+            loser = opponent;
+        } else if (opponentScore > challengerScore) {
+            winner = opponent;
+            loser = challenger;
+        }
+
+        const challengeResult: Partial<Challenge> = { status: 'completed', winnerId: winner ? winner.id : null };
+
+        const index = updatedChallenges.findIndex(c => c.id === challenge.id);
+        if (index > -1) {
+            updatedChallenges[index] = { ...updatedChallenges[index], ...challengeResult };
+        }
+        
+        dbUpdatePromises.push(updateChallenge(challenge.id, challengeResult));
+
+        if (winner && loser) {
+            const winnerUpdate: Partial<Driver> = { notifications: [...winner.notifications] };
+            const loserUpdate: Partial<Driver> = { notifications: [...loser.notifications] };
+
+            if (challenge.wagerType === 'points') {
+                winnerUpdate.points = (winner.points || 0) + challenge.wagerAmount;
+                loserUpdate.points = (loser.points || 0) - challenge.wagerAmount;
+            } else {
+                winnerUpdate.moneyBalance = (winner.moneyBalance || 0) + challenge.wagerAmount;
+                loserUpdate.moneyBalance = (loser.moneyBalance || 0) - challenge.wagerAmount;
+            }
+
+            winnerUpdate.notifications?.unshift({
+                id: Date.now() + Math.random(), title: `Desafio Vencido!`,
+                description: `Ganhou o desafio contra ${loser.name} e recebeu ${challenge.wagerAmount} ${challenge.wagerType === 'points' ? 'pontos' : '€'}.`,
+                read: false, date: new Date().toISOString(), link: '/challenges'
+            });
+             loserUpdate.notifications?.unshift({
+                id: Date.now() + Math.random(), title: `Desafio Perdido`,
+                description: `Perdeu o desafio contra ${winner.name}.`,
+                read: false, date: new Date().toISOString(), link: '/challenges'
+            });
+
+            dbUpdatePromises.push(updateDriver(winner.id, winnerUpdate));
+            dbUpdatePromises.push(updateDriver(loser.id, loserUpdate));
+
+        } else {
+            const challengerUpdate = { notifications: [...challenger.notifications] };
+            const opponentUpdate = { notifications: [...opponent.notifications] };
+
+            challengerUpdate.notifications.unshift({
+                 id: Date.now() + Math.random(), title: `Desafio Empatado`,
+                 description: `O seu desafio contra ${opponent.name} terminou em empate.`,
+                 read: false, date: new Date().toISOString(), link: '/challenges'
+            });
+            opponentUpdate.notifications.unshift({
+                 id: Date.now() + Math.random(), title: `Desafio Empatado`,
+                 description: `O seu desafio contra ${challenger.name} terminou em empate.`,
+                 read: false, date: new Date().toISOString(), link: '/challenges'
+            });
+            
+            dbUpdatePromises.push(updateDriver(challenger.id, challengerUpdate));
+            dbUpdatePromises.push(updateDriver(opponent.id, opponentUpdate));
+        }
+    }
+
+    Promise.all(dbUpdatePromises).catch(error => {
+        console.error("Failed to update challenges/drivers in the database:", error);
+    });
+
+    return { updated: true, challenges: updatedChallenges };
+};
+
+
 const ChallengeCard = ({ challenge, currentDriverId, allDrivers, onAction }: { challenge: Challenge, currentDriverId: string, allDrivers: Driver[], onAction: (challengeId: string, action: 'accept' | 'decline') => void }) => {
     const challenger = allDrivers.find(d => d.id === challenge.challengerId);
     const opponent = allDrivers.find(d => d.id === challenge.opponentId);
@@ -164,128 +272,34 @@ export default function ChallengesPage() {
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
-        const driver = await getLoggedInDriver();
-        if (driver) {
+        try {
+            const driver = await getLoggedInDriver();
+            if (!driver) {
+                setIsLoading(false);
+                return;
+            };
+
             setLoggedInDriver(driver);
             const [allDriversData, challengesData] = await Promise.all([
                 getAllDrivers(),
                 getChallengesForDriver(driver.id)
             ]);
+            
+            const { updated, challenges: resolvedChallenges } = await resolveCompletedChallenges(challengesData, allDriversData);
+
             setAllDrivers(allDriversData);
-            setChallenges(challengesData);
-            await resolveCompletedChallenges(challengesData);
+            setChallenges(updated ? resolvedChallenges : challengesData);
+
+        } catch (error) {
+            console.error("Failed to fetch challenges page data:", error);
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     }, []);
 
     useEffect(() => {
         fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    const resolveCompletedChallenges = async (currentChallenges: Challenge[]) => {
-        const now = new Date();
-        let challengesUpdated = false;
-
-        for (const c of currentChallenges) {
-            if (c.status === 'active' && parseISO(c.endDate) < now) {
-                challengesUpdated = true;
-
-                const challenger = await getDriver(c.challengerId);
-                const opponent = await getDriver(c.opponentId);
-
-                if (!challenger || !opponent) continue;
-
-                const getScore = (driver: Driver) => {
-                    const challengeInterval = { start: parseISO(c.startDate), end: parseISO(c.endDate) };
-                    switch (c.metric) {
-                        case 'deliveries':
-                            return driver.dailyDeliveries
-                                .filter(d => isWithinInterval(parseISO(d.date), challengeInterval))
-                                .reduce((sum, delivery) => sum + delivery.deliveries, 0);
-                        case 'safety': return driver.safetyScore;
-                        case 'efficiency': return driver.efficiency;
-                        default: return 0;
-                    }
-                };
-
-                const challengerScore = getScore(challenger);
-                const opponentScore = getScore(opponent);
-
-                let winner: Driver | null = null;
-                let loser: Driver | null = null;
-
-                if (challengerScore > opponentScore) {
-                    winner = challenger;
-                    loser = opponent;
-                } else if (opponentScore > challengerScore) {
-                    winner = opponent;
-                    loser = challenger;
-                }
-
-                if (winner && loser) {
-                    const updates = [];
-                    const winnerUpdate: Partial<Driver> = { notifications: [...winner.notifications] };
-                    const loserUpdate: Partial<Driver> = { notifications: [...loser.notifications] };
-
-                    if (c.wagerType === 'points') {
-                        winnerUpdate.points = (winner.points || 0) + c.wagerAmount;
-                        loserUpdate.points = (loser.points || 0) - c.wagerAmount;
-                    } else {
-                        winnerUpdate.moneyBalance = (winner.moneyBalance || 0) + c.wagerAmount;
-                        loserUpdate.moneyBalance = (loser.moneyBalance || 0) - c.wagerAmount;
-                    }
-
-                    winnerUpdate.notifications?.unshift({
-                        id: Date.now() + 1, title: `Desafio Vencido!`,
-                        description: `Ganhou o desafio contra ${loser.name} e recebeu ${c.wagerAmount} ${c.wagerType === 'points' ? 'pontos' : '€'}.`,
-                        read: false, date: new Date().toISOString(), link: '/challenges'
-                    });
-                     loserUpdate.notifications?.unshift({
-                        id: Date.now() + 2, title: `Desafio Perdido`,
-                        description: `Perdeu o desafio contra ${winner.name}.`,
-                        read: false, date: new Date().toISOString(), link: '/challenges'
-                    });
-
-                    updates.push(updateDriver(winner.id, winnerUpdate));
-                    updates.push(updateDriver(loser.id, loserUpdate));
-                    updates.push(updateChallenge(c.id, { status: 'completed', winnerId: winner.id }));
-                    await Promise.all(updates);
-
-                } else {
-                    // It's a draw, notify both
-                    const updates = [];
-                    const challengerUpdate = { notifications: [...challenger.notifications] };
-                    const opponentUpdate = { notifications: [...opponent.notifications] };
-
-                    challengerUpdate.notifications.unshift({
-                         id: Date.now() + 1, title: `Desafio Empatado`,
-                         description: `O seu desafio contra ${opponent.name} terminou em empate.`,
-                         read: false, date: new Date().toISOString(), link: '/challenges'
-                    });
-                    opponentUpdate.notifications.unshift({
-                         id: Date.now() + 2, title: `Desafio Empatado`,
-                         description: `O seu desafio contra ${challenger.name} terminou em empate.`,
-                         read: false, date: new Date().toISOString(), link: '/challenges'
-                    });
-                    
-                    updates.push(updateDriver(challenger.id, challengerUpdate));
-                    updates.push(updateDriver(opponent.id, opponentUpdate));
-                    updates.push(updateChallenge(c.id, { status: 'completed', winnerId: null }));
-                    await Promise.all(updates);
-                }
-            }
-        }
-
-        if (challengesUpdated) {
-            // Refetch challenges to update UI
-            if(loggedInDriver) {
-                const challengesData = await getChallengesForDriver(loggedInDriver.id);
-                setChallenges(challengesData);
-            }
-        }
-    };
-
+    }, [fetchData]);
 
     const form = useForm<ChallengeFormValues>({
         resolver: zodResolver(challengeFormSchema),
@@ -404,7 +418,7 @@ export default function ChallengesPage() {
         );
     }
 
-    const availableOpponents = allDrivers.filter(d => d.id !== loggedInDriver.id);
+    const availableOpponents = allDrivers.filter(d => d.id !== loggedInDriver.id && d.name !== '[VEÍCULO LIVRE]');
 
     return (
         <div className="space-y-6">
