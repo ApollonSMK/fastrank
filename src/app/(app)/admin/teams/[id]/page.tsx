@@ -178,9 +178,21 @@ export default function TeamDetailsPage() {
       teamId: team.id,
     };
     
-    await assignDriverToVehicle(data.vehicleId, newDriverData, data.password);
-    addForm.reset();
-    fetchData();
+    try {
+        await assignDriverToVehicle(data.vehicleId, newDriverData, data.password);
+        addForm.reset();
+        fetchData();
+    } catch (error: any) {
+        if (error.code === 'auth/email-already-in-use') {
+            addForm.setError('emailUsername', {
+                type: 'manual',
+                message: 'Este email já está registado.'
+            });
+        } else {
+            console.error("Error creating user:", error);
+            // Optionally, show a generic error toast
+        }
+    }
   };
 
   const onUpdateSubmit: SubmitHandler<EditFormValues> = async (data) => {
