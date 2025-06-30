@@ -94,8 +94,8 @@ const resolveCompletedChallenges = async (currentChallenges: Challenge[], allDri
         dbUpdatePromises.push(updateChallenge(challenge.id, challengeResult));
 
         if (winner && loser) {
-            const winnerUpdate: Partial<Driver> = { notifications: [...winner.notifications] };
-            const loserUpdate: Partial<Driver> = { notifications: [...loser.notifications] };
+            const winnerUpdate: Partial<Driver> = { notifications: [...(winner.notifications || [])] };
+            const loserUpdate: Partial<Driver> = { notifications: [...(loser.notifications || [])] };
 
             if (challenge.wagerType === 'points') {
                 winnerUpdate.points = (winner.points || 0) + challenge.wagerAmount;
@@ -120,8 +120,8 @@ const resolveCompletedChallenges = async (currentChallenges: Challenge[], allDri
             dbUpdatePromises.push(updateDriver(loser.id, loserUpdate));
 
         } else {
-            const challengerUpdate = { notifications: [...challenger.notifications] };
-            const opponentUpdate = { notifications: [...opponent.notifications] };
+            const challengerUpdate: Partial<Driver> = { notifications: [...(challenger.notifications || [])] };
+            const opponentUpdate: Partial<Driver> = { notifications: [...(opponent.notifications || [])] };
 
             challengerUpdate.notifications.unshift({
                  id: Date.now() + Math.random(), title: `Desafio Empatado`,
@@ -139,9 +139,7 @@ const resolveCompletedChallenges = async (currentChallenges: Challenge[], allDri
         }
     }
 
-    Promise.all(dbUpdatePromises).catch(error => {
-        console.error("Failed to update challenges/drivers in the database:", error);
-    });
+    await Promise.all(dbUpdatePromises);
 
     return { updated: true, challenges: updatedChallenges };
 };
@@ -275,6 +273,7 @@ export default function ChallengesPage() {
         try {
             const driver = await getLoggedInDriver();
             if (!driver) {
+                // No logged in driver, stop loading and return.
                 setIsLoading(false);
                 return;
             };
@@ -285,13 +284,17 @@ export default function ChallengesPage() {
                 getChallengesForDriver(driver.id)
             ]);
             
+            // This function now also handles database updates
             const { updated, challenges: resolvedChallenges } = await resolveCompletedChallenges(challengesData, allDriversData);
 
             setAllDrivers(allDriversData);
+            // If challenges were updated, we use the locally updated list for immediate UI feedback.
+            // Otherwise, we use the fresh data from the DB.
             setChallenges(updated ? resolvedChallenges : challengesData);
 
         } catch (error) {
             console.error("Failed to fetch challenges page data:", error);
+            // In case of an error, ensure UI is not stuck in loading state.
         } finally {
             setIsLoading(false);
         }
@@ -330,7 +333,7 @@ export default function ChallengesPage() {
         
         const opponentToUpdate = await getDriver(opponent.id);
         if(opponentToUpdate) {
-            const newNotifications = [...opponentToUpdate.notifications];
+            const newNotifications = [...(opponentToUpdate.notifications || [])];
             newNotifications.unshift({
                 id: Date.now(), title: "Novo Desafio!",
                 description: `${loggedInDriver.name} desafiou-te!`,
@@ -365,7 +368,7 @@ export default function ChallengesPage() {
         
         await updateChallenge(challenge.id, updates);
 
-        const newNotifications = [...challenger.notifications];
+        const newNotifications = [...(challenger.notifications || [])];
         newNotifications.unshift({
             id: Date.now(),
             title: `Desafio ${action === 'accept' ? 'Aceite' : 'Recusado'}`,
@@ -397,7 +400,7 @@ export default function ChallengesPage() {
         return { pending, active, history };
     }, [challenges, loggedInDriver]);
 
-    if (isLoading || !loggedInDriver) {
+    if (isLoading) {
         return (
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -415,6 +418,14 @@ export default function ChallengesPage() {
                     </TabsContent>
                 </Tabs>
             </div>
+        );
+    }
+    
+    if (!loggedInDriver) {
+         return (
+             <div className="space-y-6 text-center">
+                <p className="text-muted-foreground pt-10">Não foi possível carregar os seus dados. Por favor, tente fazer login novamente.</p>
+             </div>
         );
     }
 
