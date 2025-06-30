@@ -244,28 +244,12 @@ const DriversManagement = () => {
                  achievementIds: [],
             };
 
-            // B. Execute updates in a safer sequence to prevent data inconsistency.
-            try {
-                // Step 1: Remove the unique user identifier from the old vehicle first
-                // to prevent any potential momentary conflicts in the database.
-                if (oldVehicleDoc.authUid) {
-                    await updateDriver(oldVehicleDoc.id, { authUid: null });
-                }
-
-                // Step 2: Transfer all the driver's personal data to the new vehicle document.
-                await updateDriver(newVehicleDoc.id, driverPersonalData);
-                
-                // Step 3: Fully reset the old vehicle document to become a "Free Vehicle".
-                await updateDriver(oldVehicleDoc.id, freeVehicleData);
-
-            } catch (error) {
-                console.error("An error occurred during driver-vehicle swap:", error);
-                // Attempt to revert the state if something went wrong by re-assigning the authUid.
-                if (oldVehicleDoc.authUid) {
-                    await updateDriver(oldVehicleDoc.id, { authUid: oldVehicleDoc.authUid });
-                }
-                // TODO: Show a user-facing error toast message
-            }
+            // B. Execute updates in a safer sequence
+            // First, copy all personal data to the new vehicle document.
+            await updateDriver(newVehicleDoc.id, driverPersonalData);
+            
+            // Second, fully reset the old vehicle document to become a "Free Vehicle".
+            await updateDriver(oldVehicleDoc.id, freeVehicleData);
             
             // C. Log the change
             await addFleetChangeLog({

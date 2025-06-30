@@ -75,10 +75,9 @@ export async function getDriver(id: string): Promise<Driver | null> {
 }
 
 export async function getDriversByTeam(teamId: string): Promise<Driver[]> {
-    const q = query(collection(db, 'drivers'), where('teamId', '==', teamId));
-    const snapshot = await getDocs(q);
-    // Filter out free vehicles on the client side to avoid complex composite index
-    return snapshot.docs.map(d => docToObject<Driver>(d)).filter(d => d.name !== '[VEÍCULO LIVRE]');
+    const allDrivers = await getAllDrivers();
+    // Filter out free vehicles and filter by team on the client side
+    return allDrivers.filter(driver => driver.teamId === teamId && driver.name !== '[VEÍCULO LIVRE]');
 }
 
 export async function updateDriver(id: string, data: Partial<Driver>) {
@@ -314,11 +313,18 @@ export async function getLoggedInDriver(): Promise<Driver | null> {
             const q = query(collection(db, "drivers"), where("authUid", "==", user.uid), limit(1));
             const snapshot = await getDocs(q);
             if (snapshot.empty) {
+                // This means the user is authenticated but has no corresponding driver document.
+                // This can happen if the doc was deleted or corrupted.
+                // Log them out to prevent being stuck.
+                console.warn("No driver document found for authenticated user. Logging out.");
+                await signOut(auth);
                 return null;
             }
             const driver = docToObject<Driver>(snapshot.docs[0]);
             
             if (driver && driver.name === '[VEÍCULO LIVRE]') {
+                 // This user's vehicle was made free, they should be logged out.
+                await signOut(auth);
                 return null;
             }
             return driver;
