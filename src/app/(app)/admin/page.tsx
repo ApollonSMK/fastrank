@@ -27,6 +27,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -420,6 +421,9 @@ const VehiclesManagement = () => {
   const [isAddVehicleDialogOpen, setIsAddVehicleDialogOpen] = useState(false);
   const [isSubstituteDialogOpen, setIsSubstituteDialogOpen] = useState(false);
   const [vehicleForSubstitute, setVehicleForSubstitute] = useState<Driver | null>(null);
+  
+  const [vehicleToDelete, setVehicleToDelete] = useState<Driver | null>(null);
+  const [isDeleteVehicleDialogOpen, setIsDeleteVehicleDialogOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -515,6 +519,18 @@ const VehiclesManagement = () => {
         fetchData();
     };
 
+    const openDeleteVehicleDialog = (vehicle: Driver) => {
+        setVehicleToDelete(vehicle);
+        setIsDeleteVehicleDialogOpen(true);
+    };
+
+    const handleDeleteVehicle = async () => {
+        if (!vehicleToDelete) return;
+        await deleteDriver(vehicleToDelete.id);
+        setIsDeleteVehicleDialogOpen(false);
+        setVehicleToDelete(null);
+        fetchData();
+    };
 
   const handleExportFleetPDF = () => {
     const doc = new jsPDF();
@@ -708,6 +724,21 @@ const VehiclesManagement = () => {
                                                         <Replace className="mr-2 h-4 w-4" />
                                                         Gerir Substituição
                                                     </DropdownMenuItem>
+                                                    {vehicle.name === '[VEÍCULO LIVRE]' && (
+                                                        <>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem
+                                                                className="text-destructive"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    openDeleteVehicleDialog(vehicle);
+                                                                }}
+                                                            >
+                                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                                Remover Veículo
+                                                            </DropdownMenuItem>
+                                                        </>
+                                                    )}
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </CardHeader>
@@ -787,6 +818,21 @@ const VehiclesManagement = () => {
                                                                 <Replace className="mr-2 h-4 w-4" />
                                                                 Gerir Substituição
                                                             </DropdownMenuItem>
+                                                            {vehicle.name === '[VEÍCULO LIVRE]' && (
+                                                                <>
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem
+                                                                        className="text-destructive"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            openDeleteVehicleDialog(vehicle);
+                                                                        }}
+                                                                    >
+                                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                                        Remover Veículo
+                                                                    </DropdownMenuItem>
+                                                                </>
+                                                            )}
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </TableCell>
@@ -934,6 +980,21 @@ const VehiclesManagement = () => {
             </Form>
         </DialogContent>
     </Dialog>
+    
+    <AlertDialog open={isDeleteVehicleDialogOpen} onOpenChange={setIsDeleteVehicleDialogOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Tem a certeza?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Esta ação irá remover permanentemente o veículo com matrícula "{vehicleToDelete?.licensePlate}". Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setVehicleToDelete(null)}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteVehicle}>Confirmar</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 };
@@ -950,7 +1011,7 @@ const TeamsManagement = () => {
     setIsLoading(true);
     const [teamsData, driversData] = await Promise.all([getAllTeams(), getAllDrivers()]);
     setTeams(teamsData.sort((a,b) => (a.name > b.name ? 1 : -1)));
-    setDrivers(driversData);
+    setDrivers(driversData.filter(d => d.email !== 'admin@fastrack.lu'));
     setIsLoading(false);
   }, []);
 
@@ -1422,3 +1483,5 @@ export default function AdminPage() {
     </>
   );
 }
+
+    
