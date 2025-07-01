@@ -192,8 +192,12 @@ export default function CompetitionsPage() {
         if (!loggedInDriver) return { onGoing: [], finished: [] };
 
         const eligibleCompetitions = competitions.filter(comp => {
-            if (comp.participants === 'all') return true;
-            if (loggedInDriver.teamId && comp.participants.includes(loggedInDriver.teamId)) return true;
+            if (comp.participants === 'all') {
+                return true;
+            }
+            if (Array.isArray(comp.participants) && loggedInDriver.teamId && comp.participants.includes(loggedInDriver.teamId)) {
+                return true;
+            }
             return false;
         });
         
@@ -277,5 +281,3 @@ export default function CompetitionsPage() {
         </div>
     );
 }
-
-    
