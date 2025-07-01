@@ -126,12 +126,12 @@ const resolveCompletedChallenges = async (currentChallenges: Challenge[], allDri
             const challengerUpdate: Partial<Driver> = { notifications: [...(challenger.notifications || [])] };
             const opponentUpdate: Partial<Driver> = { notifications: [...(opponent.notifications || [])] };
 
-            challengerUpdate.notifications.unshift({
+            challengerUpdate.notifications?.unshift({
                  id: Date.now() + Math.random(), title: `Desafio Empatado`,
                  description: `O seu desafio contra ${opponent.name} terminou em empate.`,
                  read: false, date: new Date().toISOString(), link: '/challenges'
             });
-            opponentUpdate.notifications.unshift({
+            opponentUpdate.notifications?.unshift({
                  id: Date.now() + Math.random(), title: `Desafio Empatado`,
                  description: `O seu desafio contra ${challenger.name} terminou em empate.`,
                  read: false, date: new Date().toISOString(), link: '/challenges'
@@ -272,37 +272,27 @@ export default function ChallengesPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchData = useCallback(async () => {
-        console.log("[ChallengesPage] Iniciando a busca de dados...");
         setIsLoading(true);
         try {
-            console.log("[ChallengesPage] A obter dados do motorista autenticado...");
             const driver = await getLoggedInDriver();
             
-            if (!driver || driver.name === '[VEÍCULO LIVRE]') {
-                console.warn("[ChallengesPage] Não foi encontrado um motorista autenticado válido. Dados recebidos:", driver);
+            if (!driver) {
                 setLoggedInDriver(null);
                 setIsLoading(false);
                 return;
             };
-            console.log(`[ChallengesPage] Motorista encontrado: ${driver.name} (ID: ${driver.id})`);
 
             setLoggedInDriver(driver);
             
-            console.log("[ChallengesPage] A obter todos os motoristas e os desafios...");
             const [allDriversData, challengesData] = await Promise.all([
                 getAllDrivers(),
                 getChallengesForDriver(driver.id)
             ]);
-            console.log(`[ChallengesPage] Encontrados ${allDriversData.length} motoristas e ${challengesData.length} desafios.`);
 
             const challengesToResolve = challengesData.filter(c => c.status === 'active' && parseISO(c.endDate) < new Date());
             
-            console.log(`[ChallengesPage] Encontrados ${challengesToResolve.length} desafios para finalizar.`);
-
             if (challengesToResolve.length > 0) {
-                 console.log("[ChallengesPage] A finalizar desafios concluídos...");
                  const { updated, challenges: resolvedChallenges } = await resolveCompletedChallenges(challengesData, allDriversData);
-                 console.log(`[ChallengesPage] Desafios finalizados. Estado atualizado: ${updated}`);
                  setChallenges(updated ? resolvedChallenges : challengesData);
             } else {
                  setChallenges(challengesData);
@@ -311,9 +301,8 @@ export default function ChallengesPage() {
             setAllDrivers(allDriversData.filter(d => d.name !== '[VEÍCULO LIVRE]'));
 
         } catch (error) {
-            console.error("[ChallengesPage] ERRO CRÍTICO ao buscar dados:", error);
+            console.error("Erro ao buscar dados dos desafios:", error);
         } finally {
-            console.log("[ChallengesPage] Busca de dados concluída.");
             setIsLoading(false);
         }
     }, []);

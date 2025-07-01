@@ -120,9 +120,9 @@ export async function assignDriverToVehicle(vehicleId: string, driverData: Omit<
     const querySnapshot = await getDocs(q);
     
     // Filter out free vehicles in the client code to avoid needing a composite index
-    const existingDriver = querySnapshot.docs.find(doc => doc.data().name !== '[VEÍCULO LIVRE]');
+    const existingDrivers = querySnapshot.docs.map(doc => doc.data()).filter(d => d.name !== '[VEÍCULO LIVRE]');
 
-    if (existingDriver) {
+    if (existingDrivers.length > 0) {
         const error: any = new Error("Email is already in use.");
         error.code = 'auth/email-already-in-use';
         throw error;
@@ -348,37 +348,64 @@ export async function getLoggedInDriver(): Promise<Driver | null> {
         try {
             const q = query(collection(db, "drivers"), where("authUid", "==", user.uid), limit(1));
             const snapshot = await getDocs(q);
-            if (snapshot.empty) {
-                const qByEmail = query(collection(db, "drivers"), where("email", "==", user.email), limit(1));
-                const snapshotByEmail = await getDocs(qByEmail);
-                if (!snapshotByEmail.empty) {
-                    const driverDoc = snapshotByEmail.docs[0];
-                    const driverData = driverDoc.data();
-                    
-                    if (driverData.name === '[VEÍCULO LIVRE]') {
-                        console.warn(`Login attempt for email ${user.email} matched a free vehicle. Access denied.`);
-                        return null;
-                    }
-
-                    if (!driverData.authUid) {
-                        console.log(`Found unlinked driver document ${driverDoc.id} for email ${user.email}. Updating authUid.`);
-                        await updateDoc(doc(db, 'drivers', driverDoc.id), { authUid: user.uid });
-                        return docToObject<Driver>(await getDoc(doc(db, 'drivers', driverDoc.id)));
-                    }
-                }
-                
-                console.warn("No driver document found for authenticated user. This may be due to data inconsistency or a new account without a profile.");
-                return null;
-            }
-            const driver = docToObject<Driver>(snapshot.docs[0]);
             
-            if (driver && driver.name === '[VEÍCULO LIVRE]') {
-                console.warn(`Logged in user ${user.uid} is associated with a [VEÍCULO LIVRE] document. The account might be deactivated or data may be inconsistent. Signing out.`);
-                return null;
+            if (!snapshot.empty) {
+                const driver = docToObject<Driver>(snapshot.docs[0]);
+                if (driver.name === '[VEÍCULO LIVRE]') {
+                    return null;
+                }
+                return driver;
             }
-            return driver;
+
+            // User is authenticated but has no driver document.
+            // Let's try to find one by email and repair the link.
+            const qByEmail = query(collection(db, "drivers"), where("email", "==", user.email), limit(1));
+            const snapshotByEmail = await getDocs(qByEmail);
+
+            if (!snapshotByEmail.empty) {
+                const driverDoc = snapshotByEmail.docs[0];
+                const driverData = driverDoc.data();
+                if (driverData.name !== '[VEÍCULO LIVRE]' && !driverData.authUid) {
+                    await updateDoc(doc(db, 'drivers', driverDoc.id), { authUid: user.uid });
+                    const repairedDoc = await getDoc(doc(db, 'drivers', driverDoc.id));
+                    return docToObject<Driver>(repairedDoc);
+                }
+            }
+
+            // If still no document, create one for the admin/new user.
+            const initialHistory: VehicleHistoryEntry = {
+                licensePlate: 'N/A',
+                vehicleModel: 'Sem Veículo',
+                assignedDate: new Date().toISOString(),
+                unassignedDate: null,
+            };
+
+            const newDriverData: Omit<Driver, 'id'> = {
+                authUid: user.uid,
+                name: user.displayName || user.email?.split('@')[0] || 'Novo Motorista',
+                email: user.email!,
+                avatar: user.photoURL || '/avatars/default.png',
+                rank: 999,
+                points: 0,
+                moneyBalance: 0,
+                trips: 0,
+                safetyScore: 100,
+                efficiency: 100,
+                teamId: '',
+                licensePlate: 'N/A',
+                vehicleModel: 'Sem Veículo',
+                dailyDeliveries: [],
+                notifications: [],
+                achievementIds: [],
+                licensePlateHistory: [initialHistory],
+            };
+
+            const docRef = await addDoc(collection(db, 'drivers'), newDriverData);
+            const newDriverDoc = await getDoc(docRef);
+            return docToObject<Driver>(newDriverDoc);
+
         } catch (error) {
-            console.error("Error fetching driver data for logged in user:", error);
+            console.error("Error in getLoggedInDriver:", error);
             return null;
         }
     }
