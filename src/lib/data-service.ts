@@ -65,14 +65,14 @@ export async function signInUser(email: string, password: string): Promise<void>
     // If no document is found with the authUid, try to find one by email and repair the link.
     if (snapshot.empty) {
         console.warn(`No driver document found for UID ${user.uid}. Attempting to repair link via email.`);
-        const qByEmail = query(collection(db, "drivers"), where("email", "==", email), limit(1));
+        const qByEmail = query(collection(db, "drivers"), where("email", "==", user.email), limit(1));
         const snapshotByEmail = await getDocs(qByEmail);
 
         if (!snapshotByEmail.empty) {
             const driverDoc = snapshotByEmail.docs[0];
             // Found a driver by email. If its authUid is missing or null, update it.
             if (!driverDoc.data().authUid) {
-                console.log(`Found unlinked driver document ${driverDoc.id} for email ${email}. Updating authUid.`);
+                console.log(`Found unlinked driver document ${driverDoc.id} for email ${user.email}. Updating authUid.`);
                 await updateDoc(doc(db, 'drivers', driverDoc.id), { authUid: user.uid });
             }
         }
@@ -116,11 +116,18 @@ export async function assignDriverToVehicle(vehicleId: string, driverData: Omit<
     }
 
     // Check if email is already in use by another driver document.
-    const q = query(collection(db, "drivers"), where("email", "==", driverData.email), where("name", "!=", "[VEÍCULO LIVRE]"));
-    const existingDriverSnap = await getDocs(q);
-    if(!existingDriverSnap.empty) {
-        throw new Error("auth/email-already-in-use");
+    const q = query(collection(db, "drivers"), where("email", "==", driverData.email));
+    const querySnapshot = await getDocs(q);
+    
+    // Filter out free vehicles in the client code to avoid needing a composite index
+    const existingDriver = querySnapshot.docs.find(doc => doc.data().name !== '[VEÍCULO LIVRE]');
+
+    if (existingDriver) {
+        const error: any = new Error("Email is already in use.");
+        error.code = 'auth/email-already-in-use';
+        throw error;
     }
+
 
     const userCredential = await createUserWithEmailAndPassword(auth, driverData.email, password);
     const user = userCredential.user;
@@ -342,13 +349,25 @@ export async function getLoggedInDriver(): Promise<Driver | null> {
             const q = query(collection(db, "drivers"), where("authUid", "==", user.uid), limit(1));
             const snapshot = await getDocs(q);
             if (snapshot.empty) {
+                const qByEmail = query(collection(db, "drivers"), where("email", "==", user.email), limit(1));
+                const snapshotByEmail = await getDocs(qByEmail);
+                if (!snapshotByEmail.empty) {
+                    const driverDoc = snapshotByEmail.docs[0];
+                    if (!driverDoc.data().authUid) {
+                        console.log(`Found unlinked driver document ${driverDoc.id} for email ${user.email}. Updating authUid.`);
+                        await updateDoc(doc(db, 'drivers', driverDoc.id), { authUid: user.uid });
+                        return docToObject<Driver>(await getDoc(doc(db, 'drivers', driverDoc.id)));
+                    }
+                }
+                
                 console.warn("No driver document found for authenticated user. This may be due to data inconsistency or a new account without a profile.");
                 return null;
             }
             const driver = docToObject<Driver>(snapshot.docs[0]);
             
             if (driver && driver.name === '[VEÍCULO LIVRE]') {
-                console.warn(`Logged in user ${user.uid} is associated with a [VEÍCULO LIVRE] document. The account might be deactivated or data may be inconsistent. Returning null profile.`);
+                console.warn(`Logged in user ${user.uid} is associated with a [VEÍCULO LIVRE] document. The account might be deactivated or data may be inconsistent. Signing out.`);
+                await signOutUser();
                 return null;
             }
             return driver;
