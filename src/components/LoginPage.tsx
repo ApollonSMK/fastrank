@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Car } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { signInUser, signUpUser } from '@/lib/data-service';
+import InstallPwaPrompt from '@/components/InstallPwaPrompt';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -76,6 +77,7 @@ export default function LoginPage() {
 
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+            <InstallPwaPrompt />
             <main className="w-full max-w-md">
                  <Card className="w-full border-primary/20 shadow-lg shadow-primary/10">
                     <CardHeader className="text-center">
