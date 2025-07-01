@@ -3,12 +3,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getLoggedInDriver, signOutUser } from "@/lib/data-service";
 import { Driver, achievements } from "@/lib/data-types";
 import { TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, Rocket, Award, Trophy, CalendarDays, Wallet, Star, LogOut } from "lucide-react";
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from "@/components/ui/skeleton";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { DateRange } from "react-day-picker";
@@ -90,8 +90,27 @@ export default function ProfilePage() {
     router.push('/');
   };
 
-  if (isLoading || !driver) {
+  if (isLoading) {
     return <ProfileSkeleton />;
+  }
+  
+  if (!driver) {
+     return (
+        <div className="flex flex-col items-center justify-center text-center h-64">
+            <Card className="p-6">
+                <CardTitle>Perfil não encontrado</CardTitle>
+                <CardDescription className="mt-2">
+                    Não foi possível carregar os dados do seu perfil de motorista.
+                    Isto pode acontecer se a sua conta foi desativada ou se os dados estão inconsistentes.
+                    Por favor, contacte um administrador.
+                </CardDescription>
+                 <Button onClick={handleLogout} className="mt-4">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Terminar Sessão
+                </Button>
+            </Card>
+        </div>
+    );
   }
 
   const { name, rank, trips, safetyScore, efficiency, dailyDeliveries, achievementIds, points, moneyBalance } = driver;

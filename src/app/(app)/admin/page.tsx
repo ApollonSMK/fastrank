@@ -255,11 +255,25 @@ const DriversManagement = () => {
             const freeVehicleUpdates: Partial<Driver> = {
                 ...freeVehicleNewInfo,
                 licensePlateHistory: freeVehicleHistory,
+                name: '[VEÍCULO LIVRE]',
+                email: '',
+                authUid: null,
+                teamId: '',
+                avatar: '/avatars/default.png',
+                rank: 999,
+                points: 0,
+                moneyBalance: 0,
+                trips: 0,
+                safetyScore: 100,
+                efficiency: 100,
+                dailyDeliveries: [],
+                notifications: [],
+                achievementIds: [],
             };
 
             // F. Execute the atomic swap
             await updateDriver(driverDoc.id, driverUpdates);
-            await updateDriver(freeVehicleDoc.id, freeVehicleUpdates);
+            await updateDriver(freeVehicleDoc.id, freeVehicleUpdates as Driver);
 
             // G. Log the change
             await addFleetChangeLog({

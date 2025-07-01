@@ -115,6 +115,13 @@ export async function assignDriverToVehicle(vehicleId: string, driverData: Omit<
          throw new Error("Email is required.");
     }
 
+    // Check if email is already in use by another driver document.
+    const q = query(collection(db, "drivers"), where("email", "==", driverData.email), where("name", "!=", "[VEÍCULO LIVRE]"));
+    const existingDriverSnap = await getDocs(q);
+    if(!existingDriverSnap.empty) {
+        throw new Error("auth/email-already-in-use");
+    }
+
     const userCredential = await createUserWithEmailAndPassword(auth, driverData.email, password);
     const user = userCredential.user;
 
@@ -335,16 +342,13 @@ export async function getLoggedInDriver(): Promise<Driver | null> {
             const q = query(collection(db, "drivers"), where("authUid", "==", user.uid), limit(1));
             const snapshot = await getDocs(q);
             if (snapshot.empty) {
-                // Removed the automatic signOut(auth) call to prevent login loops.
-                // The UI layer will handle the case where a driver is not found.
-                console.warn("No driver document found for authenticated user. The user might need to create a profile or the data might be unlinked.");
+                console.warn("No driver document found for authenticated user. This may be due to data inconsistency or a new account without a profile.");
                 return null;
             }
             const driver = docToObject<Driver>(snapshot.docs[0]);
             
             if (driver && driver.name === '[VEÍCULO LIVRE]') {
-                 // This is a valid case for logout. If an admin frees up a vehicle, the associated driver account is essentially disabled.
-                await signOut(auth);
+                console.warn(`Logged in user ${user.uid} is associated with a [VEÍCULO LIVRE] document. The account might be deactivated or data may be inconsistent. Returning null profile.`);
                 return null;
             }
             return driver;
