@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Team, Competition, Driver, FleetChangeLog, VehicleHistoryEntry } from "@/lib/data-types";
 import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition, getFleetChangeLog, updateDriver, getDriver, deleteDriver, addFreeVehicle, addFleetChangeLog } from "@/lib/data-service";
-import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart, Trash2, Car, FileDown, Contact, History, Edit } from "lucide-react";
+import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart, Trash2, Car, FileDown, Contact, History, Edit, Replace } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,6 +90,12 @@ const addVehicleFormSchema = z.object({
     vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
 });
 type AddVehicleFormValues = z.infer<typeof addVehicleFormSchema>;
+
+const substituteVehicleFormSchema = z.object({
+    licensePlate: z.string().min(1, { message: "A matrícula é obrigatória." }),
+    vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
+});
+type SubstituteVehicleFormValues = z.infer<typeof substituteVehicleFormSchema>;
 
 
 const StatisticsManagement = () => {
@@ -205,81 +211,50 @@ const DriversManagement = () => {
 
             if (!driverDoc || !freeVehicleDoc || freeVehicleDoc.name !== '[VEÍCULO LIVRE]') {
                 console.error("Invalid vehicle swap operation.");
-                // TODO: Add user-facing error (toast)
                 return;
             }
             
-            // A. Prepare new vehicle details for the driver
-            const driverNewVehicleInfo = {
-                licensePlate: freeVehicleDoc.licensePlate,
-                vehicleModel: freeVehicleDoc.vehicleModel,
-            };
-            // B. Prepare old vehicle details for the free vehicle doc
-            const freeVehicleNewInfo = {
-                licensePlate: driverDoc.licensePlate,
-                vehicleModel: driverDoc.vehicleModel,
-            };
-
-            // C. Update driver's history
-            const driverHistory = [...(driverDoc.licensePlateHistory || [])];
-            const lastDriverEntry = driverHistory.find(entry => entry.unassignedDate === null);
-            if (lastDriverEntry) {
-                lastDriverEntry.unassignedDate = new Date().toISOString();
-            }
-            driverHistory.push({
-                ...driverNewVehicleInfo,
-                assignedDate: new Date().toISOString(),
-                unassignedDate: null,
-            });
-            
-            // D. Update free vehicle's history
-            const freeVehicleHistory = [...(freeVehicleDoc.licensePlateHistory || [])];
-            const lastFreeVehicleEntry = freeVehicleHistory.find(entry => entry.unassignedDate === null);
-            if (lastFreeVehicleEntry) {
-                lastFreeVehicleEntry.unassignedDate = new Date().toISOString();
-            }
-            freeVehicleHistory.push({
-                ...freeVehicleNewInfo,
-                assignedDate: new Date().toISOString(),
-                unassignedDate: null,
-            });
-            
-            // E. Prepare full update objects
             const driverUpdates: Partial<Driver> = {
                 name: data.name,
                 teamId: newTeamId,
-                ...driverNewVehicleInfo,
-                licensePlateHistory: driverHistory,
+                licensePlate: freeVehicleDoc.licensePlate,
+                vehicleModel: freeVehicleDoc.vehicleModel,
+                licensePlateHistory: [
+                    ...(driverDoc.licensePlateHistory || []).map(entry => 
+                        entry.unassignedDate === null ? { ...entry, unassignedDate: new Date().toISOString() } : entry
+                    ),
+                    {
+                        licensePlate: freeVehicleDoc.licensePlate,
+                        vehicleModel: freeVehicleDoc.vehicleModel,
+                        assignedDate: new Date().toISOString(),
+                        unassignedDate: null,
+                    }
+                ],
             };
 
             const freeVehicleUpdates: Partial<Driver> = {
-                ...freeVehicleNewInfo,
-                licensePlateHistory: freeVehicleHistory,
-                name: '[VEÍCULO LIVRE]',
-                email: '',
-                authUid: null,
-                teamId: '',
-                avatar: '/avatars/default.png',
-                rank: 999,
-                points: 0,
-                moneyBalance: 0,
-                trips: 0,
-                safetyScore: 100,
-                efficiency: 100,
-                dailyDeliveries: [],
-                notifications: [],
-                achievementIds: [],
+                licensePlate: driverDoc.licensePlate,
+                vehicleModel: driverDoc.vehicleModel,
+                licensePlateHistory: [
+                    ...(freeVehicleDoc.licensePlateHistory || []).map(entry => 
+                        entry.unassignedDate === null ? { ...entry, unassignedDate: new Date().toISOString() } : entry
+                    ),
+                    {
+                        licensePlate: driverDoc.licensePlate,
+                        vehicleModel: driverDoc.vehicleModel,
+                        assignedDate: new Date().toISOString(),
+                        unassignedDate: null,
+                    }
+                ],
             };
-
-            // F. Execute the atomic swap
+            
             await updateDriver(driverDoc.id, driverUpdates);
-            await updateDriver(freeVehicleDoc.id, freeVehicleUpdates as Driver);
+            await updateDriver(freeVehicleDoc.id, freeVehicleUpdates);
 
-            // G. Log the change
             await addFleetChangeLog({
-                driverId: driverDoc.id, // Log against the driver's permanent ID
+                driverId: driverDoc.id,
                 driverName: data.name,
-                changeDescription: `Motorista ${data.name} transferido do veículo ${freeVehicleNewInfo.licensePlate} para ${driverNewVehicleInfo.licensePlate}.`
+                changeDescription: `Motorista ${data.name} transferido do veículo ${driverDoc.licensePlate} para ${freeVehicleDoc.licensePlate}.`
             });
         }
 
@@ -442,6 +417,8 @@ const VehiclesManagement = () => {
   const [changeLog, setChangeLog] = useState<FleetChangeLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddVehicleDialogOpen, setIsAddVehicleDialogOpen] = useState(false);
+  const [isSubstituteDialogOpen, setIsSubstituteDialogOpen] = useState(false);
+  const [vehicleForSubstitute, setVehicleForSubstitute] = useState<Driver | null>(null);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -470,6 +447,10 @@ const VehiclesManagement = () => {
         vehicleModel: '',
     },
   });
+  
+  const substituteVehicleForm = useForm<SubstituteVehicleFormValues>({
+    resolver: zodResolver(substituteVehicleFormSchema),
+  });
 
   const onAddVehicleSubmit: SubmitHandler<AddVehicleFormValues> = async (data) => {
     const plateExists = vehicles.some(v => v.licensePlate.toUpperCase() === data.licensePlate.toUpperCase());
@@ -487,6 +468,52 @@ const VehiclesManagement = () => {
     fetchData();
   };
 
+    const openSubstituteDialog = (vehicle: Driver) => {
+        setVehicleForSubstitute(vehicle);
+        substituteVehicleForm.reset({
+            licensePlate: vehicle.substituteVehicle?.licensePlate || '',
+            vehicleModel: vehicle.substituteVehicle?.vehicleModel || '',
+        });
+        setIsSubstituteDialogOpen(true);
+    };
+
+    const onAddSubstituteSubmit: SubmitHandler<SubstituteVehicleFormValues> = async (data) => {
+        if (!vehicleForSubstitute) return;
+
+        await updateDriver(vehicleForSubstitute.id, { substituteVehicle: data });
+        
+        const logDescription = vehicleForSubstitute.substituteVehicle 
+            ? `Substituição para o veículo ${vehicleForSubstitute.licensePlate} alterada para ${data.licensePlate} (${data.vehicleModel}).`
+            : `Veículo de substituição ${data.licensePlate} (${data.vehicleModel}) adicionado para ${vehicleForSubstitute.licensePlate}.`
+
+        await addFleetChangeLog({
+            driverId: vehicleForSubstitute.id,
+            driverName: vehicleForSubstitute.name,
+            changeDescription: logDescription
+        });
+        
+        setIsSubstituteDialogOpen(false);
+        setVehicleForSubstitute(null);
+        fetchData();
+    };
+
+    const handleRemoveSubstitute = async () => {
+        if (!vehicleForSubstitute || !vehicleForSubstitute.substituteVehicle) return;
+
+        await updateDriver(vehicleForSubstitute.id, { substituteVehicle: null });
+        
+        await addFleetChangeLog({
+            driverId: vehicleForSubstitute.id,
+            driverName: vehicleForSubstitute.name,
+            changeDescription: `Veículo de substituição ${vehicleForSubstitute.substituteVehicle.licensePlate} removido do veículo ${vehicleForSubstitute.licensePlate}.`
+        });
+
+        setIsSubstituteDialogOpen(false);
+        setVehicleForSubstitute(null);
+        fetchData();
+    };
+
+
   const handleExportFleetPDF = () => {
     const doc = new jsPDF();
     const today = format(new Date(), "dd/MM/yyyy");
@@ -502,21 +529,32 @@ const VehiclesManagement = () => {
         return a.licensePlate.localeCompare(b.licensePlate);
     });
 
+    const bodyData: (string | { content: string, styles: { fontStyle: 'italic', textColor: number[] } })[][] = [];
+    sortedVehicles.forEach(vehicle => {
+        const isAssigned = vehicle.name !== '[VEÍCULO LIVRE]';
+        const driverName = isAssigned ? vehicle.name : 'Livre';
+        const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'Sem Equipa') : 'N/A';
+        bodyData.push([
+            vehicle.licensePlate,
+            vehicle.vehicleModel,
+            driverName,
+            teamName
+        ]);
+        if (vehicle.substituteVehicle) {
+            bodyData.push([
+                { content: `  ↳ ${vehicle.substituteVehicle.licensePlate}`, styles: { fontStyle: 'italic', textColor: [100, 100, 100] } },
+                { content: vehicle.substituteVehicle.vehicleModel, styles: { fontStyle: 'italic', textColor: [100, 100, 100] } },
+                { content: 'Substituição', styles: { fontStyle: 'italic', textColor: [100, 100, 100] } },
+                ''
+            ]);
+        }
+    });
+
 
     (autoTable as any)(doc, {
         startY: 20,
         head: [['Matrícula', 'Modelo do Veículo', 'Motorista', 'Equipa']],
-        body: sortedVehicles.map(vehicle => {
-           const isAssigned = vehicle.name !== '[VEÍCULO LIVRE]';
-           const driverName = isAssigned ? vehicle.name : 'Livre';
-           const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'Sem Equipa') : 'N/A';
-           return [
-                vehicle.licensePlate,
-                vehicle.vehicleModel,
-                driverName,
-                teamName
-           ]
-        }),
+        body: bodyData,
         headStyles: { fillColor: [45, 100, 51] },
         theme: 'striped',
     });
@@ -628,6 +666,7 @@ const VehiclesManagement = () => {
                             <TableHead>Modelo do Veículo</TableHead>
                             <TableHead>Motorista</TableHead>
                             <TableHead>Equipa</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -638,6 +677,7 @@ const VehiclesManagement = () => {
                                         <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                                         <TableCell><Skeleton className="h-5 w-36" /></TableCell>
                                         <TableCell><Skeleton className="h-5 w-28" /></TableCell>
+                                        <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                                     </TableRow>
                                 ))
                             ) : (
@@ -646,12 +686,44 @@ const VehiclesManagement = () => {
                                     const driverName = isAssigned ? vehicle.name : 'Livre';
                                     const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'Sem Equipa') : 'N/A';
                                     return (
-                                        <TableRow key={vehicle.id}>
+                                        <React.Fragment key={vehicle.id}>
+                                        <TableRow>
                                             <TableCell>{vehicle.licensePlate}</TableCell>
                                             <TableCell>{vehicle.vehicleModel}</TableCell>
                                             <TableCell className="font-medium">{driverName}</TableCell>
                                             <TableCell>{teamName}</TableCell>
+                                            <TableCell className="text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon">
+                                                            <MoreVertical className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => openSubstituteDialog(vehicle)}>
+                                                            <Replace className="mr-2 h-4 w-4" />
+                                                            Gerir Substituição
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
                                         </TableRow>
+                                        {vehicle.substituteVehicle && (
+                                            <TableRow className="bg-muted/20 hover:bg-muted/40">
+                                                <TableCell colSpan={5} className="py-2 px-4">
+                                                    <div className="flex items-center gap-4 pl-4 border-l-4 border-amber-500">
+                                                        <Replace className="h-5 w-5 text-amber-500" />
+                                                        <div>
+                                                            <p className="font-semibold text-amber-500">Veículo de Substituição</p>
+                                                            <p className="text-sm text-muted-foreground">
+                                                                {vehicle.substituteVehicle.licensePlate} - {vehicle.substituteVehicle.vehicleModel}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                        </React.Fragment>
                                     )
                                 })
                             )}
@@ -697,6 +769,54 @@ const VehiclesManagement = () => {
             </Tabs>
         </CardContent>
     </Card>
+
+    <Dialog open={isSubstituteDialogOpen} onOpenChange={setIsSubstituteDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Gerir Veículo de Substituição</DialogTitle>
+                <DialogDescription>
+                    Adicione ou remova um veículo temporário para {vehicleForSubstitute?.licensePlate}.
+                </DialogDescription>
+            </DialogHeader>
+            <Form {...substituteVehicleForm}>
+                <form onSubmit={substituteVehicleForm.handleSubmit(onAddSubstituteSubmit)} className="space-y-4 py-4">
+                    <FormField
+                        control={substituteVehicleForm.control}
+                        name="licensePlate"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Matrícula da Substituição</FormLabel>
+                            <FormControl><Input placeholder="Ex: AB-12-CD" {...field} /></FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={substituteVehicleForm.control}
+                        name="vehicleModel"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Modelo da Substituição</FormLabel>
+                            <FormControl><Input placeholder="Ex: Renault Clio" {...field} /></FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <DialogFooter className="grid grid-cols-2 gap-2 pt-4">
+                        {vehicleForSubstitute?.substituteVehicle && (
+                            <Button variant="destructive" type="button" onClick={handleRemoveSubstitute}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remover Substituição
+                            </Button>
+                        )}
+                        <Button type="submit" className={!vehicleForSubstitute?.substituteVehicle ? "col-span-2" : ""}>
+                            Guardar
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </Form>
+        </DialogContent>
+    </Dialog>
     </>
   );
 };

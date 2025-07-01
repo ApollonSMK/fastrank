@@ -43,6 +43,11 @@ export type VehicleHistoryEntry = {
   unassignedDate: string | null; // ISO
 };
 
+export type SubstituteVehicle = {
+  licensePlate: string;
+  vehicleModel: string;
+};
+
 export type Driver = {
   id: string; // Firestore ID
   authUid: string | null; // Firebase Auth User ID
@@ -63,6 +68,7 @@ export type Driver = {
   achievementIds: string[];
   notifications: Notification[];
   licensePlateHistory: VehicleHistoryEntry[];
+  substituteVehicle?: SubstituteVehicle | null;
 };
 
 export type Team = {
