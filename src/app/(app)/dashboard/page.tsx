@@ -108,7 +108,6 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
         </CardHeader>
         <CardContent>
             <TooltipProvider>
-                {achievementIds.length > 0 ? (
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-6">
                     {achievementIds.map(id => {
                     const achievement = achievements[id];
@@ -131,14 +130,12 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
                     );
                     })}
                 </div>
-                ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma conquista ainda.</p>
-                )}
+                
             </TooltipProvider>
         </CardContent>
       </Card>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Pontos</CardTitle>
@@ -159,7 +156,7 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
           </Card>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         {stats.map((stat, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -549,7 +546,7 @@ export default function DashboardPage() {
                       </CardContent>
                     </Card>
                   </DialogTrigger>
-                  <DialogContent className="w-[95vw] max-w-none sm:max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto rounded-lg">
+                  <DialogContent className="w-[95vw] sm:max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto rounded-lg">
                      <DialogHeader className="sr-only">
                         <DialogTitle>Perfil de {driver.name}</DialogTitle>
                         <DialogDescription>
@@ -572,7 +569,7 @@ export default function DashboardPage() {
           deliveryForm.reset();
         }
       }}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="w-[95vw] sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Gerir Entregas de {selectedDriverForDeliveries?.name}</DialogTitle>
             <DialogDescription>Adicione ou remova registos de entregas diárias.</DialogDescription>

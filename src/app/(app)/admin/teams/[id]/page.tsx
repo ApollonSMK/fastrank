@@ -711,7 +711,7 @@ export default function TeamDetailsPage() {
           deliveryForm.reset();
         }
       }}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="w-[95vw] sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Gerir Entregas de {selectedDriverForDeliveries?.name}</DialogTitle>
             <DialogDescription>Adicione ou remova registos de entregas diárias.</DialogDescription>
