@@ -69,6 +69,7 @@ export type Driver = {
   notifications: Notification[];
   licensePlateHistory: VehicleHistoryEntry[];
   substituteVehicle?: SubstituteVehicle | null;
+  lastDailyRewardClaimed?: string;
 };
 
 export type Team = {

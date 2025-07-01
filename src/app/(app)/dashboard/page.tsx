@@ -326,17 +326,17 @@ export default function DashboardPage() {
   const handleAddDelivery: SubmitHandler<DeliveryFormValues> = async (data) => {
     if (!selectedDriverForDeliveries) return;
 
+    const driverToUpdate = await getDriver(selectedDriverForDeliveries.id);
+    if (!driverToUpdate) return;
+    
     const newDelivery: DailyDelivery = {
       date: format(data.date, 'yyyy-MM-dd'),
       deliveries: data.deliveries,
     };
 
-    const driverToUpdate = await getDriver(selectedDriverForDeliveries.id);
-    if (!driverToUpdate) return;
-    
     const existingDates = new Set(driverToUpdate.dailyDeliveries.map(d => d.date));
     if (existingDates.has(newDelivery.date)) {
-        console.error("A delivery record for this date already exists.");
+        deliveryForm.setError("date", { type: "manual", message: "Já existe um registo para esta data." });
         return;
     }
 
@@ -373,15 +373,32 @@ export default function DashboardPage() {
             date: new Date().toISOString()
         });
     }
-
-    await updateDriver(driverToUpdate.id, { 
+    
+    const updates: Partial<Driver> = { 
         dailyDeliveries: updatedDeliveries,
-        notifications: newNotifications,
         achievementIds: newAchievementIds,
-    });
+    };
+    
+    if (data.deliveries >= 20) {
+        updates.points = (driverToUpdate.points || 0) + 10;
+        newNotifications.unshift({
+            id: Date.now() + 2,
+            title: "Bónus de Entregas!",
+            description: `Parabéns! Ganhou 10 pontos por fazer ${data.deliveries} entregas.`,
+            read: false,
+            date: new Date().toISOString(),
+        });
+    }
+    
+    updates.notifications = newNotifications;
+
+    await updateDriver(driverToUpdate.id, updates);
 
     deliveryForm.reset();
     fetchData(); // Refresh data
+
+    const updatedDriverForDialog = await getDriver(selectedDriverForDeliveries.id);
+    if(updatedDriverForDialog) setSelectedDriverForDeliveries(updatedDriverForDialog);
   };
   
   const handleRemoveDelivery = async (dateToRemove: string) => {
@@ -395,11 +412,14 @@ export default function DashboardPage() {
     await updateDriver(driverToUpdate.id, { dailyDeliveries: updatedDeliveries });
 
     fetchData(); // Refresh data
+    const updatedDriverForDialog = await getDriver(selectedDriverForDeliveries.id);
+    if(updatedDriverForDialog) setSelectedDriverForDeliveries(updatedDriverForDialog);
   };
 
   const openDeliveriesDialog = (e: React.MouseEvent, driver: Driver) => {
     e.stopPropagation();
     setSelectedDriverForDeliveries(driver);
+    deliveryForm.reset();
     setIsDeliveriesDialogOpen(true);
   };
 
@@ -596,7 +616,7 @@ export default function DashboardPage() {
                                 selected={field.value}
                                 onSelect={field.onChange}
                                 disabled={(date) =>
-                                  date > new Date() || date < new Date("2000-01-01")
+                                  date > new Date() || date < new Date("2000-01-01") || (selectedDriverForDeliveries?.dailyDeliveries.some(d => d.date === format(date, 'yyyy-MM-dd')) ?? false)
                                 }
                                 initialFocus
                               />

@@ -37,7 +37,7 @@ export async function signUpUser(driverData: Partial<Omit<Driver, 'id' | 'authUi
         email: driverData.email,
         avatar: driverData.avatar || '/avatars/default.png',
         rank: 999,
-        points: 0,
+        points: 100,
         moneyBalance: 0,
         trips: 0,
         safetyScore: 100,
@@ -119,15 +119,13 @@ export async function assignDriverToVehicle(vehicleId: string, driverData: Omit<
     const q = query(collection(db, "drivers"), where("email", "==", driverData.email));
     const querySnapshot = await getDocs(q);
     
-    // Filter out free vehicles in the client code to avoid needing a composite index
     const existingDrivers = querySnapshot.docs.map(doc => doc.data()).filter(d => d.name !== '[VEÍCULO LIVRE]');
 
     if (existingDrivers.length > 0) {
-        const error: any = new Error("Email is already in use.");
+        const error: any = new Error("Este email já está a ser utilizado.");
         error.code = 'auth/email-already-in-use';
         throw error;
     }
-
 
     const userCredential = await createUserWithEmailAndPassword(auth, driverData.email, password);
     const user = userCredential.user;
@@ -139,7 +137,7 @@ export async function assignDriverToVehicle(vehicleId: string, driverData: Omit<
         teamId: driverData.teamId,
         avatar: driverData.avatar || '/avatars/default.png',
         rank: 999,
-        points: 0,
+        points: 100,
         moneyBalance: 0,
         trips: 0,
         safetyScore: 100,
@@ -278,12 +276,30 @@ export async function deleteCompetition(id: string) {
 }
 
 export async function enrollInCompetition(competitionId: string, driverId: string) {
+    const driverRef = doc(db, 'drivers', driverId);
+    const driverDoc = await getDoc(driverRef);
+
+    if (!driverDoc.exists()) {
+        throw new Error("Motorista não encontrado.");
+    }
+
+    const driverData = driverDoc.data() as Driver;
+
+    if ((driverData.points || 0) < 10) {
+        throw new Error("Pontos insuficientes para se inscrever. Necessita de 10 pontos.");
+    }
+
+    // Deduct points
+    await updateDoc(driverRef, {
+        points: (driverData.points || 0) - 10
+    });
+
+    // Enroll in competition
     const competitionRef = doc(db, 'competitions', competitionId);
     await updateDoc(competitionRef, {
         enrolledDriverIds: arrayUnion(driverId)
     });
 }
-
 
 // --- Challenge Functions ---
 export async function getChallengesForDriver(driverId: string): Promise<Challenge[]> {
@@ -339,75 +355,110 @@ export async function getFleetChangeLog(): Promise<FleetChangeLog[]> {
     return snapshot.docs.map(l => docToObject<FleetChangeLog>(l));
 }
 
+// --- Daily Rewards ---
+export async function claimDailyReward(driverId: string): Promise<number> {
+    const driverRef = doc(db, 'drivers', driverId);
+    const driverDoc = await getDoc(driverRef);
+
+    if (!driverDoc.exists()) {
+        throw new Error("Motorista não encontrado.");
+    }
+
+    const driverData = driverDoc.data() as Driver;
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+
+    if (driverData.lastDailyRewardClaimed === today) {
+        throw new Error("Já resgatou a recompensa diária de hoje.");
+    }
+
+    const newPoints = (driverData.points || 0) + 5;
+
+    await updateDoc(driverRef, {
+        points: newPoints,
+        lastDailyRewardClaimed: today
+    });
+    
+    return newPoints;
+}
+
 
 // --- Logged In User ---
 export async function getLoggedInDriver(): Promise<Driver | null> {
     await authInitialized;
     const user = auth.currentUser;
-    if (user) {
-        try {
-            const q = query(collection(db, "drivers"), where("authUid", "==", user.uid), limit(1));
-            const snapshot = await getDocs(q);
-            
-            if (!snapshot.empty) {
-                const driver = docToObject<Driver>(snapshot.docs[0]);
-                if (driver.name === '[VEÍCULO LIVRE]') {
-                    return null;
-                }
-                return driver;
-            }
-
-            // User is authenticated but has no driver document.
-            // Let's try to find one by email and repair the link.
-            const qByEmail = query(collection(db, "drivers"), where("email", "==", user.email), limit(1));
-            const snapshotByEmail = await getDocs(qByEmail);
-
-            if (!snapshotByEmail.empty) {
-                const driverDoc = snapshotByEmail.docs[0];
-                const driverData = driverDoc.data();
-                if (driverData.name !== '[VEÍCULO LIVRE]' && !driverData.authUid) {
-                    await updateDoc(doc(db, 'drivers', driverDoc.id), { authUid: user.uid });
-                    const repairedDoc = await getDoc(doc(db, 'drivers', driverDoc.id));
-                    return docToObject<Driver>(repairedDoc);
-                }
-            }
-
-            // If still no document, create one for the admin/new user.
-            const initialHistory: VehicleHistoryEntry = {
-                licensePlate: 'N/A',
-                vehicleModel: 'Sem Veículo',
-                assignedDate: new Date().toISOString(),
-                unassignedDate: null,
-            };
-
-            const newDriverData: Omit<Driver, 'id'> = {
-                authUid: user.uid,
-                name: user.displayName || user.email?.split('@')[0] || 'Novo Motorista',
-                email: user.email!,
-                avatar: user.photoURL || '/avatars/default.png',
-                rank: 999,
-                points: 0,
-                moneyBalance: 0,
-                trips: 0,
-                safetyScore: 100,
-                efficiency: 100,
-                teamId: '',
-                licensePlate: 'N/A',
-                vehicleModel: 'Sem Veículo',
-                dailyDeliveries: [],
-                notifications: [],
-                achievementIds: [],
-                licensePlateHistory: [initialHistory],
-            };
-
-            const docRef = await addDoc(collection(db, 'drivers'), newDriverData);
-            const newDriverDoc = await getDoc(docRef);
-            return docToObject<Driver>(newDriverDoc);
-
-        } catch (error) {
-            console.error("Error in getLoggedInDriver:", error);
-            return null;
-        }
+    if (!user) {
+        return null;
     }
-    return null;
+
+    try {
+        const q = query(collection(db, "drivers"), where("authUid", "==", user.uid), limit(1));
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+            const driver = docToObject<Driver>(snapshot.docs[0]);
+            // If the user's document corresponds to a "[VEÍCULO LIVRE]", treat as no valid profile
+            if (driver.name === '[VEÍCULO LIVRE]') {
+                // This case should ideally not happen for a logged-in user.
+                // It indicates data inconsistency.
+                console.warn(`User ${user.uid} is linked to a free vehicle document.`)
+                await signOut(auth); // Sign out to prevent inconsistent states.
+                return null;
+            }
+            return driver;
+        }
+
+        // User is authenticated but has no driver document.
+        console.log(`No driver document found for UID ${user.uid}. Checking by email...`);
+        const qByEmail = query(collection(db, "drivers"), where("email", "==", user.email), limit(1));
+        const snapshotByEmail = await getDocs(qByEmail);
+
+        if (!snapshotByEmail.empty) {
+            const driverDoc = snapshotByEmail.docs[0];
+            const driverData = driverDoc.data();
+            if (driverData.name !== '[VEÍCULO LIVRE]' && !driverData.authUid) {
+                console.log(`Found unlinked driver document ${driverDoc.id} for email ${user.email}. Repairing link.`);
+                await updateDoc(doc(db, 'drivers', driverDoc.id), { authUid: user.uid });
+                const repairedDoc = await getDoc(doc(db, 'drivers', driverDoc.id));
+                return docToObject<Driver>(repairedDoc);
+            }
+        }
+
+        // If still no document, it's likely an admin or a user whose profile was deleted.
+        // Create a new profile for them.
+        console.log(`No existing profile for ${user.email}. Creating a new one.`);
+        const initialHistory: VehicleHistoryEntry = {
+            licensePlate: 'N/A',
+            vehicleModel: 'Sem Veículo',
+            assignedDate: new Date().toISOString(),
+            unassignedDate: null,
+        };
+
+        const newDriverData: Omit<Driver, 'id'> = {
+            authUid: user.uid,
+            name: user.displayName || user.email?.split('@')[0] || 'Novo Motorista',
+            email: user.email!,
+            avatar: user.photoURL || '/avatars/default.png',
+            rank: 999,
+            points: 100,
+            moneyBalance: 0,
+            trips: 0,
+            safetyScore: 100,
+            efficiency: 100,
+            teamId: '',
+            licensePlate: 'N/A',
+            vehicleModel: 'Sem Veículo',
+            dailyDeliveries: [],
+            notifications: [],
+            achievementIds: [],
+            licensePlateHistory: [initialHistory],
+        };
+
+        const docRef = await addDoc(collection(db, 'drivers'), newDriverData);
+        const newDriverDoc = await getDoc(docRef);
+        return docToObject<Driver>(newDriverDoc);
+
+    } catch (error) {
+        console.error("Error in getLoggedInDriver:", error);
+        return null;
+    }
 }

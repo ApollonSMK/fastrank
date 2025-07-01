@@ -292,6 +292,7 @@ export default function TeamDetailsPage() {
 
   const openDeliveriesDialog = (driver: Driver) => {
     setSelectedDriverForDeliveries(driver);
+    deliveryForm.reset();
     setIsDeliveriesDialogOpen(true);
   };
   
@@ -338,7 +339,7 @@ export default function TeamDetailsPage() {
   const handleAddDelivery: SubmitHandler<DeliveryFormValues> = async (data) => {
     if (!selectedDriverForDeliveries) return;
 
-    const driverToUpdate = teamMembers.find(d => d.id === selectedDriverForDeliveries.id);
+    const driverToUpdate = await getDriver(selectedDriverForDeliveries.id);
     if (!driverToUpdate) return;
 
     const newDelivery: DailyDelivery = {
@@ -348,15 +349,13 @@ export default function TeamDetailsPage() {
 
     const existingDeliveryIndex = driverToUpdate.dailyDeliveries.findIndex(d => d.date === newDelivery.date);
     
-    let updatedDeliveries: DailyDelivery[];
     if (existingDeliveryIndex > -1) {
-      // In a real app, a toast notification would be better.
-      console.error("A delivery record for this date already exists. Not adding.");
+      deliveryForm.setError("date", { type: "manual", message: "Já existe um registo para esta data."});
       return;
-    } else {
-      updatedDeliveries = [...driverToUpdate.dailyDeliveries, newDelivery]
+    } 
+    
+    const updatedDeliveries = [...driverToUpdate.dailyDeliveries, newDelivery]
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }
 
     const newNotifications = [...driverToUpdate.notifications];
     newNotifications.unshift({
@@ -388,11 +387,25 @@ export default function TeamDetailsPage() {
         });
     }
     
-    await updateDriver(driverToUpdate.id, { 
+    const updates: Partial<Driver> = { 
       dailyDeliveries: updatedDeliveries,
-      notifications: newNotifications,
       achievementIds: newAchievementIds,
-    });
+    };
+
+    if (data.deliveries >= 20) {
+        updates.points = (driverToUpdate.points || 0) + 10;
+        newNotifications.unshift({
+            id: Date.now() + 2,
+            title: "Bónus de Entregas!",
+            description: `Parabéns! Ganhou 10 pontos por fazer ${data.deliveries} entregas.`,
+            read: false,
+            date: new Date().toISOString(),
+        });
+    }
+
+    updates.notifications = newNotifications;
+    
+    await updateDriver(driverToUpdate.id, updates);
     
     deliveryForm.reset();
     fetchData();
@@ -404,7 +417,7 @@ export default function TeamDetailsPage() {
   const handleRemoveDelivery = async (dateToRemove: string) => {
     if (!selectedDriverForDeliveries) return;
     
-    const driverToUpdate = teamMembers.find(d => d.id === selectedDriverForDeliveries.id);
+    const driverToUpdate = await getDriver(selectedDriverForDeliveries.id);
     if (!driverToUpdate) return;
     
     const updatedDeliveries = driverToUpdate.dailyDeliveries.filter(d => d.date !== dateToRemove);

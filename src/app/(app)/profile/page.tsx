@@ -5,9 +5,9 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getLoggedInDriver, signOutUser } from "@/lib/data-service";
+import { getLoggedInDriver, signOutUser, claimDailyReward } from "@/lib/data-service";
 import { Driver, achievements } from "@/lib/data-types";
-import { TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, Rocket, Award, Trophy, CalendarDays, Wallet, Star, LogOut } from "lucide-react";
+import { TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, Rocket, Award, Trophy, CalendarDays, Wallet, Star, LogOut, Gift } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -18,6 +18,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Tooltip as UiTooltip, TooltipContent as UiTooltipContent, TooltipProvider, TooltipTrigger as UiTooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
 
 
 const chartConfig = {
@@ -69,6 +70,8 @@ export default function ProfilePage() {
   const [driver, setDriver] = useState<Driver | null>(null);
   const [date, setDate] = useState<DateRange | undefined>();
   const [isLoading, setIsLoading] = useState(true);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchDriver = async () => {
@@ -89,6 +92,30 @@ export default function ProfilePage() {
     await signOutUser();
     router.push('/');
   };
+
+  const handleClaimReward = async () => {
+    if (!driver) return;
+    setIsClaiming(true);
+    try {
+        await claimDailyReward(driver.id);
+        toast({
+            title: "Recompensa Resgatada!",
+            description: "Ganhou 5 pontos. Volte amanhã!",
+        });
+        // refetch driver data to update points and button state
+        const updatedDriver = await getLoggedInDriver();
+        setDriver(updatedDriver);
+    } catch (error: any) {
+        toast({
+            variant: "destructive",
+            title: "Erro",
+            description: error.message || "Não foi possível resgatar a recompensa.",
+        });
+    } finally {
+        setIsClaiming(false);
+    }
+  };
+
 
   if (isLoading) {
     return <ProfileSkeleton />;
@@ -113,7 +140,7 @@ export default function ProfilePage() {
     );
   }
 
-  const { name, rank, trips, safetyScore, efficiency, dailyDeliveries, achievementIds, points, moneyBalance } = driver;
+  const { name, rank, trips, safetyScore, efficiency, dailyDeliveries, achievementIds, points, moneyBalance, lastDailyRewardClaimed } = driver;
   const totalDeliveries = dailyDeliveries.reduce((sum, day) => sum + day.deliveries, 0);
 
   const stats = [
@@ -135,6 +162,9 @@ export default function ProfilePage() {
       date: d.dateObj.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' }),
       deliveries: d.deliveries,
     }));
+  
+  const today = new Date().toISOString().split('T')[0];
+  const canClaim = lastDailyRewardClaimed !== today;
 
 
   return (
@@ -206,6 +236,18 @@ export default function ProfilePage() {
             </CardContent>
         </Card>
       </div>
+      
+      <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Gift className="h-5 w-5 text-primary"/>Recompensa Diária</CardTitle>
+            <CardDescription>Volte todos os dias para resgatar 5 pontos de bónus.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Button className="w-full" onClick={handleClaimReward} disabled={!canClaim || isClaiming}>
+                {isClaiming ? 'Aguarde...' : canClaim ? 'Resgatar 5 Pontos' : 'Recompensa já resgatada hoje'}
+            </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-2 gap-4">
         {stats.map((stat, index) => (

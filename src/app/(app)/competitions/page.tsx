@@ -103,9 +103,13 @@ const CompetitionCard = ({ competition, teams, loggedInDriver, onEnroll }: { com
                         </Button>
                     </Link>
                 ) : isEnrollmentOpen ? (
-                    <Button className="w-full" onClick={onEnroll}>
+                     <Button 
+                        className="w-full" 
+                        onClick={onEnroll}
+                        disabled={!loggedInDriver || loggedInDriver.points < 10}
+                    >
                         <PlusCircle className="mr-2 h-4 w-4" />
-                        Inscrever-se
+                        {loggedInDriver && loggedInDriver.points >= 10 ? 'Inscrever-se (Custa 10 Pontos)' : 'Pontos Insuficientes'}
                     </Button>
                 ) : (
                     <Button className="w-full" disabled>
@@ -175,14 +179,14 @@ export default function CompetitionsPage() {
             await enrollInCompetition(competitionId, loggedInDriver.id);
             toast({
                 title: "Inscrição com Sucesso!",
-                description: `Está agora inscrito na competição "${competitionName}". Boa sorte!`,
+                description: `Está agora inscrito na competição "${competitionName}". Foram deduzidos 10 pontos.`,
             });
             fetchData();
-        } catch (error) {
+        } catch (error: any) {
             toast({
                 variant: "destructive",
                 title: "Erro na Inscrição",
-                description: "Não foi possível concluir a sua inscrição. Tente novamente.",
+                description: error.message || "Não foi possível concluir a sua inscrição. Tente novamente.",
             });
             console.error("Enrollment failed:", error);
         }
@@ -192,7 +196,7 @@ export default function CompetitionsPage() {
         const eligibleCompetitions = competitions.filter(comp => {
             // If no driver is logged in (e.g., an admin), only show public competitions.
             if (!loggedInDriver) {
-                return comp.participants === 'all';
+                 return comp.participants === 'all';
             }
 
             // If a driver is logged in, show competitions for 'all' or for their specific team.
