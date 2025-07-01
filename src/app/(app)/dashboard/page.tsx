@@ -109,7 +109,7 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
         <CardContent>
             <TooltipProvider>
                 {achievementIds.length > 0 ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 text-center">
+                <div className="flex flex-wrap justify-center gap-x-4 gap-y-6">
                     {achievementIds.map(id => {
                     const achievement = achievements[id];
                     if (!achievement) return null;
@@ -117,11 +117,11 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
                     return (
                         <UiTooltip key={id}>
                             <UiTooltipTrigger asChild>
-                                <div className="flex flex-col items-center gap-2">
-                                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-accent/10 border-2 border-accent text-accent-foreground">
+                                <div className="flex flex-col items-center gap-2 w-16 text-center">
+                                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-accent/10 border-2 border-accent text-accent-foreground shrink-0">
                                         <Icon className="h-6 w-6 text-accent drop-shadow-[0_0_5px_hsl(var(--accent))]" />
                                     </div>
-                                    <span className="text-xs font-medium">{achievement.name}</span>
+                                    <span className="text-xs font-medium leading-tight">{achievement.name}</span>
                                 </div>
                             </UiTooltipTrigger>
                             <UiTooltipContent>
@@ -138,7 +138,7 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
         </CardContent>
       </Card>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Pontos</CardTitle>
@@ -159,7 +159,7 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
           </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {stats.map((stat, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

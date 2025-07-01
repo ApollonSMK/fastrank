@@ -162,7 +162,7 @@ export default function DriverProfilePage() {
         <CardContent>
             <TooltipProvider>
                 {achievementIds.length > 0 ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 text-center">
+                <div className="flex flex-wrap justify-center gap-x-4 gap-y-6">
                     {achievementIds.map(id => {
                     const achievement = achievements[id];
                     if (!achievement) return null;
@@ -170,11 +170,11 @@ export default function DriverProfilePage() {
                     return (
                         <UiTooltip key={id}>
                             <UiTooltipTrigger asChild>
-                                <div className="flex flex-col items-center gap-2">
-                                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-accent/10 border-2 border-accent text-accent-foreground">
+                                <div className="flex flex-col items-center gap-2 w-16 text-center">
+                                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-accent/10 border-2 border-accent text-accent-foreground shrink-0">
                                         <Icon className="h-6 w-6 text-accent drop-shadow-[0_0_5px_hsl(var(--accent))]" />
                                     </div>
-                                    <span className="text-xs font-medium">{achievement.name}</span>
+                                    <span className="text-xs font-medium leading-tight">{achievement.name}</span>
                                 </div>
                             </UiTooltipTrigger>
                             <UiTooltipContent>
