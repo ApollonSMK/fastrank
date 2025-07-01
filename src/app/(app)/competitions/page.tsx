@@ -189,9 +189,13 @@ export default function CompetitionsPage() {
     };
 
     const { onGoing, finished } = useMemo(() => {
-        if (!loggedInDriver) return { onGoing: [], finished: [] };
-
         const eligibleCompetitions = competitions.filter(comp => {
+            // If no driver is logged in (e.g., an admin), only show public competitions.
+            if (!loggedInDriver) {
+                return comp.participants === 'all';
+            }
+
+            // If a driver is logged in, show competitions for 'all' or for their specific team.
             if (comp.participants === 'all') {
                 return true;
             }
