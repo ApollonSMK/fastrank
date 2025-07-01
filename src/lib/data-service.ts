@@ -353,7 +353,14 @@ export async function getLoggedInDriver(): Promise<Driver | null> {
                 const snapshotByEmail = await getDocs(qByEmail);
                 if (!snapshotByEmail.empty) {
                     const driverDoc = snapshotByEmail.docs[0];
-                    if (!driverDoc.data().authUid) {
+                    const driverData = driverDoc.data();
+                    
+                    if (driverData.name === '[VEÍCULO LIVRE]') {
+                        console.warn(`Login attempt for email ${user.email} matched a free vehicle. Access denied.`);
+                        return null;
+                    }
+
+                    if (!driverData.authUid) {
                         console.log(`Found unlinked driver document ${driverDoc.id} for email ${user.email}. Updating authUid.`);
                         await updateDoc(doc(db, 'drivers', driverDoc.id), { authUid: user.uid });
                         return docToObject<Driver>(await getDoc(doc(db, 'drivers', driverDoc.id)));
@@ -367,7 +374,6 @@ export async function getLoggedInDriver(): Promise<Driver | null> {
             
             if (driver && driver.name === '[VEÍCULO LIVRE]') {
                 console.warn(`Logged in user ${user.uid} is associated with a [VEÍCULO LIVRE] document. The account might be deactivated or data may be inconsistent. Signing out.`);
-                await signOutUser();
                 return null;
             }
             return driver;

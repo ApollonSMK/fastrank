@@ -55,7 +55,10 @@ const resolveCompletedChallenges = async (currentChallenges: Challenge[], allDri
         const challenger = allDriversMap.get(challenge.challengerId);
         const opponent = allDriversMap.get(challenge.opponentId);
 
-        if (!challenger || !opponent) continue;
+        if (!challenger || !opponent || challenger.name === '[VEÍCULO LIVRE]' || opponent.name === '[VEÍCULO LIVRE]') {
+            console.warn(`Skipping challenge ${challenge.id} due to missing or invalid participant.`);
+            continue;
+        }
 
         const getScore = (driver: Driver) => {
             const challengeInterval = { start: parseISO(challenge.startDate), end: parseISO(challenge.endDate) };
@@ -273,7 +276,7 @@ export default function ChallengesPage() {
         try {
             const driver = await getLoggedInDriver();
             if (!driver) {
-                // No logged in driver, stop loading and return.
+                setLoggedInDriver(null);
                 setIsLoading(false);
                 return;
             };
