@@ -278,7 +278,7 @@ export default function DashboardPage() {
   }, [fetchData]);
 
   useEffect(() => {
-    const activeDrivers = drivers.filter(d => d.name !== '[VEÍCULO LIVRE]' && d.email !== 'admin@fastrack.lu');
+    const activeDrivers = drivers.filter(d => d.name !== '[VEÍCULO LIVRE]' && d.email !== 'info@fastrack.lu');
     
     const teamFilteredDrivers =
       selectedTeamId === 'all'

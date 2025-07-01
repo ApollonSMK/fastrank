@@ -132,7 +132,7 @@ const DriversManagement = () => {
             getAllDrivers(),
             getAllTeams(),
         ]);
-        const activeDrivers = driversData.filter(d => d.name !== '[VEÍCULO LIVRE]' && d.email !== 'admin@fastrack.lu');
+        const activeDrivers = driversData.filter(d => d.name !== '[VEÍCULO LIVRE]' && d.email !== 'info@fastrack.lu');
         const freeVehiclesData = driversData.filter(d => d.name === '[VEÍCULO LIVRE]');
 
         setDrivers(activeDrivers.sort((a,b) => a.name.localeCompare(b.name)));
@@ -433,7 +433,7 @@ const VehiclesManagement = () => {
       getAllTeams(),
     ]);
     
-    const allVehicles = driversData.filter(d => d.email !== 'admin@fastrack.lu');
+    const allVehicles = driversData.filter(d => d.email !== 'info@fastrack.lu');
     allVehicles.sort((a, b) => a.licensePlate.localeCompare(b.licensePlate));
 
     setVehicles(allVehicles);
@@ -1011,7 +1011,7 @@ const TeamsManagement = () => {
     setIsLoading(true);
     const [teamsData, driversData] = await Promise.all([getAllTeams(), getAllDrivers()]);
     setTeams(teamsData.sort((a,b) => (a.name > b.name ? 1 : -1)));
-    setDrivers(driversData.filter(d => d.email !== 'admin@fastrack.lu'));
+    setDrivers(driversData.filter(d => d.email !== 'info@fastrack.lu'));
     setIsLoading(false);
   }, []);
 
@@ -1483,5 +1483,3 @@ export default function AdminPage() {
     </>
   );
 }
-
-    
