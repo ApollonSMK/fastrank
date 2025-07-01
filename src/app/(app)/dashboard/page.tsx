@@ -549,7 +549,7 @@ export default function DashboardPage() {
                       </CardContent>
                     </Card>
                   </DialogTrigger>
-                  <DialogContent className="max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+                  <DialogContent className="w-[90vw] max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto rounded-lg">
                      <DialogHeader className="sr-only">
                         <DialogTitle>Perfil de {driver.name}</DialogTitle>
                         <DialogDescription>
