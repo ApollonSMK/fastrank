@@ -1280,7 +1280,7 @@ export default function AdminPage() {
     <>
         <h2 className="font-headline text-2xl font-bold">Painel de Admin</h2>
         <Tabs defaultValue="statistics" className="space-y-4">
-            <TabsList className="w-full justify-start overflow-x-auto sm:w-auto sm:justify-center">
+            <TabsList className="w-full justify-start overflow-x-auto sm:w-auto sm:justify-center hide-scrollbar">
                 <TabsTrigger value="statistics"><BarChart className="mr-2 h-4 w-4" /> Estatísticas</TabsTrigger>
                 <TabsTrigger value="drivers"><Contact className="mr-2 h-4 w-4" /> Motoristas</TabsTrigger>
                 <TabsTrigger value="teams"><Users className="mr-2 h-4 w-4" /> Equipas</TabsTrigger>

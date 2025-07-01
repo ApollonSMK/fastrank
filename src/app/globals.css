@@ -73,4 +73,14 @@ body {
       0 0 5px hsl(var(--primary) / 0.7),
       0 0 10px hsl(var(--primary) / 0.9);
   }
+
+  /* For hiding scrollbars */
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
 }
