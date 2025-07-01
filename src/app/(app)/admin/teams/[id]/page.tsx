@@ -723,12 +723,12 @@ export default function TeamDetailsPage() {
               </CardHeader>
               <CardContent>
                 <Form {...deliveryForm}>
-                  <form onSubmit={deliveryForm.handleSubmit(handleAddDelivery)} className="flex items-end gap-4">
+                  <form onSubmit={deliveryForm.handleSubmit(handleAddDelivery)} className="flex flex-col sm:flex-row sm:items-end gap-4">
                     <FormField
                       control={deliveryForm.control}
                       name="date"
                       render={({ field }) => (
-                        <FormItem className="flex flex-col">
+                        <FormItem className="flex flex-col flex-grow">
                           <FormLabel>Data</FormLabel>
                           <Popover>
                             <PopoverTrigger asChild>
@@ -736,7 +736,7 @@ export default function TeamDetailsPage() {
                                 <Button
                                   variant={"outline"}
                                   className={cn(
-                                    "w-[240px] pl-3 text-left font-normal",
+                                    "w-full justify-start text-left font-normal",
                                     !field.value && "text-muted-foreground"
                                   )}
                                 >
@@ -769,16 +769,16 @@ export default function TeamDetailsPage() {
                       control={deliveryForm.control}
                       name="deliveries"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="w-full sm:w-32">
                           <FormLabel>Nº de Entregas</FormLabel>
                           <FormControl>
-                            <Input type="number" className="w-32" {...field} />
+                            <Input type="number" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    <Button type="submit">Adicionar</Button>
+                    <Button type="submit" className="w-full sm:w-auto">Adicionar</Button>
                   </form>
                 </Form>
               </CardContent>
