@@ -107,9 +107,9 @@ export default function TeamDetailsPage() {
         getAllDrivers()
     ]);
     setTeam(teamData);
-    setTeamMembers(membersData);
+    setTeamMembers(membersData.filter(m => m.email !== 'admin@fastrack.lu'));
     setAllTeams(allTeamsData);
-    setAllDrivers(allDriversData);
+    setAllDrivers(allDriversData.filter(d => d.email !== 'admin@fastrack.lu'));
     setFreeVehicles(allDriversData.filter(d => d.name === '[VEÍCULO LIVRE]'));
     setIsLoading(false);
   }, [teamId]);

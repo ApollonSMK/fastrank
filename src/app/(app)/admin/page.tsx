@@ -131,7 +131,7 @@ const DriversManagement = () => {
             getAllDrivers(),
             getAllTeams(),
         ]);
-        const activeDrivers = driversData.filter(d => d.name !== '[VEÍCULO LIVRE]');
+        const activeDrivers = driversData.filter(d => d.name !== '[VEÍCULO LIVRE]' && d.email !== 'admin@fastrack.lu');
         const freeVehiclesData = driversData.filter(d => d.name === '[VEÍCULO LIVRE]');
 
         setDrivers(activeDrivers.sort((a,b) => a.name.localeCompare(b.name)));
@@ -429,9 +429,10 @@ const VehiclesManagement = () => {
       getAllTeams(),
     ]);
     
-    driversData.sort((a, b) => a.licensePlate.localeCompare(b.licensePlate));
+    const allVehicles = driversData.filter(d => d.email !== 'admin@fastrack.lu');
+    allVehicles.sort((a, b) => a.licensePlate.localeCompare(b.licensePlate));
 
-    setVehicles(driversData);
+    setVehicles(allVehicles);
     setTeams(teamsData);
     setChangeLog(logData);
     setIsLoading(false);
@@ -1421,11 +1422,3 @@ export default function AdminPage() {
     </>
   );
 }
-
-    
-
-    
-
-
-
-    

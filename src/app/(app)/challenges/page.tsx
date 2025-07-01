@@ -298,7 +298,7 @@ export default function ChallengesPage() {
                  setChallenges(challengesData);
             }
            
-            setAllDrivers(allDriversData.filter(d => d.name !== '[VEÍCULO LIVRE]'));
+            setAllDrivers(allDriversData.filter(d => d.name !== '[VEÍCULO LIVRE]' && d.email !== 'admin@fastrack.lu'));
 
         } catch (error) {
             console.error("Erro ao buscar dados dos desafios:", error);

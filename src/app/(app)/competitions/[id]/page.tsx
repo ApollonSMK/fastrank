@@ -62,7 +62,7 @@ export default function CompetitionLeaderboardPage() {
             getAllTeams()
         ]);
         setCompetition(compData);
-        setAllDrivers(driversData);
+        setAllDrivers(driversData.filter(d => d.email !== 'admin@fastrack.lu'));
         setTeams(teamsData);
         setIsLoading(false);
     }, [competitionId]);
@@ -206,5 +206,3 @@ export default function CompetitionLeaderboardPage() {
         </div>
     );
 }
-
-    
