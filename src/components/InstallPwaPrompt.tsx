@@ -10,7 +10,7 @@ import {
   DialogDescription,
   DialogFooter
 } from '@/components/ui/dialog';
-import { ArrowUpFromSquare, PlusSquare } from 'lucide-react';
+import { Share2, PlusSquare } from 'lucide-react';
 
 export default function InstallPwaPrompt() {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -83,7 +83,7 @@ export default function InstallPwaPrompt() {
             <p>Siga estes passos para instalar a aplicação no seu dispositivo:</p>
             <ol className="list-decimal list-inside space-y-3 rounded-md border p-4">
               <li>
-                Toque no botão de <strong>Partilha</strong> (<ArrowUpFromSquare className="inline-block h-4 w-4" />) no menu do seu navegador.
+                Toque no botão de <strong>Partilha</strong> (<Share2 className="inline-block h-4 w-4" />) no menu do seu navegador.
               </li>
               <li>
                 Deslize para baixo na lista de opções e toque em <strong>Adicionar ao ecrã principal</strong> (<PlusSquare className="inline-block h-4 w-4" />).
