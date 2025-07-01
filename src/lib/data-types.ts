@@ -94,6 +94,7 @@ export type Competition = {
   endDate: string; // ISO string
   rewardType: 'points' | 'money';
   rewardAmount: number;
+  enrollmentCost: number;
 };
 
 export type FleetChangeLog = {

@@ -76,6 +76,7 @@ const competitionFormSchema = z.object({
   }),
   rewardType: z.enum(['points', 'money'], { required_error: "O tipo de prémio é obrigatório."}),
   rewardAmount: z.coerce.number().min(1, { message: "O valor do prémio deve ser positivo."}),
+  enrollmentCost: z.coerce.number().min(0, { message: "O custo de inscrição não pode ser negativo." }),
 });
 
 const editDriverFormSchema = z.object({
@@ -987,6 +988,7 @@ const CompetitionsManagement = () => {
       description: "",
       rewardType: "points",
       rewardAmount: 100,
+      enrollmentCost: 10,
     },
   });
 
@@ -1010,6 +1012,7 @@ const CompetitionsManagement = () => {
       endDate: values.dateRange.to.toISOString(),
       rewardType: values.rewardType,
       rewardAmount: values.rewardAmount,
+      enrollmentCost: values.enrollmentCost,
     };
     
     await addCompetition(newCompetition);
@@ -1130,37 +1133,44 @@ const CompetitionsManagement = () => {
                             </FormItem>
                         )} />
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField control={form.control} name="rewardType" render={({ field }) => (
-                                <FormItem className="space-y-3">
-                                <FormLabel>Tipo de Prémio</FormLabel>
-                                <FormControl>
-                                    <RadioGroup
-                                    onValueChange={field.onChange}
-                                    defaultValue={field.value}
-                                    className="flex space-x-4"
-                                    >
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
-                                        <FormControl>
-                                            <RadioGroupItem value="points" />
-                                        </FormControl>
-                                        <FormLabel className="font-normal">Pontos</FormLabel>
-                                    </FormItem>
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
-                                        <FormControl>
-                                            <RadioGroupItem value="money" />
-                                        </FormControl>
-                                        <FormLabel className="font-normal">Dinheiro</FormLabel>
-                                    </FormItem>
-                                    </RadioGroup>
-                                </FormControl>
-                                <FormMessage />
+                        <FormField control={form.control} name="rewardType" render={({ field }) => (
+                            <FormItem className="space-y-3">
+                            <FormLabel>Tipo de Prémio</FormLabel>
+                            <FormControl>
+                                <RadioGroup
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                                className="flex space-x-4"
+                                >
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                    <FormControl>
+                                        <RadioGroupItem value="points" />
+                                    </FormControl>
+                                    <FormLabel className="font-normal">Pontos</FormLabel>
                                 </FormItem>
-                            )} />
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                    <FormControl>
+                                        <RadioGroupItem value="money" />
+                                    </FormControl>
+                                    <FormLabel className="font-normal">Dinheiro</FormLabel>
+                                </FormItem>
+                                </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )} />
+                        <div className="grid grid-cols-2 gap-4">
                             <FormField control={form.control} name="rewardAmount" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Valor do Prémio</FormLabel>
                                     <FormControl><Input type="number" placeholder="Ex: 100" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                             <FormField control={form.control} name="enrollmentCost" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Custo de Inscrição (Pontos)</FormLabel>
+                                    <FormControl><Input type="number" placeholder="Ex: 10" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />

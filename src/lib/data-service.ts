@@ -277,25 +277,36 @@ export async function deleteCompetition(id: string) {
 
 export async function enrollInCompetition(competitionId: string, driverId: string) {
     const driverRef = doc(db, 'drivers', driverId);
-    const driverDoc = await getDoc(driverRef);
+    const competitionRef = doc(db, 'competitions', competitionId);
+
+    const [driverDoc, competitionDoc] = await Promise.all([
+        getDoc(driverRef),
+        getDoc(competitionRef)
+    ]);
 
     if (!driverDoc.exists()) {
         throw new Error("Motorista não encontrado.");
     }
+    if (!competitionDoc.exists()) {
+        throw new Error("Competição não encontrada.");
+    }
 
     const driverData = driverDoc.data() as Driver;
+    const competitionData = docToObject<Competition>(competitionDoc);
+    const enrollmentCost = competitionData.enrollmentCost || 0;
 
-    if ((driverData.points || 0) < 10) {
-        throw new Error("Pontos insuficientes para se inscrever. Necessita de 10 pontos.");
+    if ((driverData.points || 0) < enrollmentCost) {
+        throw new Error(`Pontos insuficientes. São necessários ${enrollmentCost} pontos para se inscrever.`);
     }
 
     // Deduct points
-    await updateDoc(driverRef, {
-        points: (driverData.points || 0) - 10
-    });
+    if (enrollmentCost > 0) {
+        await updateDoc(driverRef, {
+            points: (driverData.points || 0) - enrollmentCost
+        });
+    }
 
     // Enroll in competition
-    const competitionRef = doc(db, 'competitions', competitionId);
     await updateDoc(competitionRef, {
         enrolledDriverIds: arrayUnion(driverId)
     });

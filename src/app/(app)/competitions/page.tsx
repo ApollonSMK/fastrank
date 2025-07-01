@@ -47,6 +47,7 @@ const CompetitionCard = ({ competition, teams, loggedInDriver, onEnroll }: { com
 
     const isEnrollmentOpen = new Date() < new Date(competition.startDate);
     const isEnrolled = loggedInDriver ? competition.enrolledDriverIds?.includes(loggedInDriver.id) : false;
+    const enrollmentCost = competition.enrollmentCost || 0;
 
     return (
         <Card className="border-primary/20 shadow-lg shadow-primary/10 hover:border-primary/50 transition-all">
@@ -106,10 +107,13 @@ const CompetitionCard = ({ competition, teams, loggedInDriver, onEnroll }: { com
                      <Button 
                         className="w-full" 
                         onClick={onEnroll}
-                        disabled={!loggedInDriver || loggedInDriver.points < 10}
+                        disabled={!loggedInDriver || loggedInDriver.points < enrollmentCost}
                     >
                         <PlusCircle className="mr-2 h-4 w-4" />
-                        {loggedInDriver && loggedInDriver.points >= 10 ? 'Inscrever-se (Custa 10 Pontos)' : 'Pontos Insuficientes'}
+                        {enrollmentCost > 0
+                            ? `Inscrever-se (Custa ${enrollmentCost} Pontos)`
+                            : 'Inscrever-se (Grátis)'
+                        }
                     </Button>
                 ) : (
                     <Button className="w-full" disabled>
@@ -175,11 +179,18 @@ export default function CompetitionsPage() {
 
     const handleEnroll = async (competitionId: string, competitionName: string) => {
         if (!loggedInDriver) return;
+
+        const competition = competitions.find(c => c.id === competitionId);
+        if (!competition) return;
+
         try {
             await enrollInCompetition(competitionId, loggedInDriver.id);
+            const cost = competition.enrollmentCost || 0;
             toast({
                 title: "Inscrição com Sucesso!",
-                description: `Está agora inscrito na competição "${competitionName}". Foram deduzidos 10 pontos.`,
+                description: cost > 0
+                    ? `Está agora inscrito na competição "${competitionName}". Foram deduzidos ${cost} pontos.`
+                    : `Está agora inscrito na competição "${competitionName}".`,
             });
             fetchData();
         } catch (error: any) {
