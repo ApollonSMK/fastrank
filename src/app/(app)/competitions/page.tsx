@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -249,7 +248,7 @@ export default function CompetitionsPage() {
             
             <Tabs defaultValue="ongoing" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="ongoing">Em Andamento & Futuras</TabsTrigger>
+                    <TabsTrigger value="ongoing">Em Andamento</TabsTrigger>
                     <TabsTrigger value="history">Histórico</TabsTrigger>
                 </TabsList>
                 <TabsContent value="ongoing" className="mt-6">
@@ -269,7 +268,7 @@ export default function CompetitionsPage() {
                     ) : (
                         <Card>
                             <CardContent className="p-10 text-center">
-                                <p className="text-muted-foreground">De momento, não há competições ativas ou futuras.</p>
+                                <p className="text-muted-foreground">De momento, não há competições em andamento.</p>
                             </CardContent>
                         </Card>
                     )}
