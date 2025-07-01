@@ -272,33 +272,48 @@ export default function ChallengesPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchData = useCallback(async () => {
+        console.log("[ChallengesPage] Iniciando a busca de dados...");
         setIsLoading(true);
         try {
+            console.log("[ChallengesPage] A obter dados do motorista autenticado...");
             const driver = await getLoggedInDriver();
-            if (!driver) {
+            
+            if (!driver || driver.name === '[VEÍCULO LIVRE]') {
+                console.warn("[ChallengesPage] Não foi encontrado um motorista autenticado válido. Dados recebidos:", driver);
                 setLoggedInDriver(null);
                 setIsLoading(false);
                 return;
             };
+            console.log(`[ChallengesPage] Motorista encontrado: ${driver.name} (ID: ${driver.id})`);
 
             setLoggedInDriver(driver);
+            
+            console.log("[ChallengesPage] A obter todos os motoristas e os desafios...");
             const [allDriversData, challengesData] = await Promise.all([
                 getAllDrivers(),
                 getChallengesForDriver(driver.id)
             ]);
-            
-            // This function now also handles database updates
-            const { updated, challenges: resolvedChallenges } = await resolveCompletedChallenges(challengesData, allDriversData);
+            console.log(`[ChallengesPage] Encontrados ${allDriversData.length} motoristas e ${challengesData.length} desafios.`);
 
-            setAllDrivers(allDriversData);
-            // If challenges were updated, we use the locally updated list for immediate UI feedback.
-            // Otherwise, we use the fresh data from the DB.
-            setChallenges(updated ? resolvedChallenges : challengesData);
+            const challengesToResolve = challengesData.filter(c => c.status === 'active' && parseISO(c.endDate) < new Date());
+            
+            console.log(`[ChallengesPage] Encontrados ${challengesToResolve.length} desafios para finalizar.`);
+
+            if (challengesToResolve.length > 0) {
+                 console.log("[ChallengesPage] A finalizar desafios concluídos...");
+                 const { updated, challenges: resolvedChallenges } = await resolveCompletedChallenges(challengesData, allDriversData);
+                 console.log(`[ChallengesPage] Desafios finalizados. Estado atualizado: ${updated}`);
+                 setChallenges(updated ? resolvedChallenges : challengesData);
+            } else {
+                 setChallenges(challengesData);
+            }
+           
+            setAllDrivers(allDriversData.filter(d => d.name !== '[VEÍCULO LIVRE]'));
 
         } catch (error) {
-            console.error("Failed to fetch challenges page data:", error);
-            // In case of an error, ensure UI is not stuck in loading state.
+            console.error("[ChallengesPage] ERRO CRÍTICO ao buscar dados:", error);
         } finally {
+            console.log("[ChallengesPage] Busca de dados concluída.");
             setIsLoading(false);
         }
     }, []);
