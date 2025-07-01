@@ -29,14 +29,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
+  DialogFooter as DialogFormFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
@@ -384,10 +384,10 @@ const DriversManagement = () => {
                                 <FormMessage />
                             </FormItem>
                         )} />
-                        <DialogFooter>
+                        <DialogFormFooter>
                             <Button variant="outline" type="button" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
                             <Button type="submit">Guardar Alterações</Button>
-                        </DialogFooter>
+                        </DialogFormFooter>
                     </form>
                 </Form>
             </DialogContent>
@@ -647,10 +647,10 @@ const VehiclesManagement = () => {
                                                 </FormItem>
                                             )}
                                         />
-                                        <DialogFooter>
+                                        <DialogFormFooter>
                                             <Button variant="outline" type="button" onClick={() => setIsAddVehicleDialogOpen(false)}>Cancelar</Button>
                                             <Button type="submit">Adicionar Veículo</Button>
-                                        </DialogFooter>
+                                        </DialogFormFooter>
                                     </form>
                                 </Form>
                             </DialogContent>
@@ -660,76 +660,158 @@ const VehiclesManagement = () => {
                             Exportar Frota
                         </Button>
                     </div>
-                     <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Matrícula</TableHead>
-                            <TableHead>Modelo do Veículo</TableHead>
-                            <TableHead>Motorista</TableHead>
-                            <TableHead>Equipa</TableHead>
-                            <TableHead className="text-right">Ações</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {isLoading ? (
-                                [...Array(5)].map((_, i) => (
-                                    <TableRow key={i}>
-                                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                                        <TableCell><Skeleton className="h-5 w-36" /></TableCell>
-                                        <TableCell><Skeleton className="h-5 w-28" /></TableCell>
-                                        <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                sortedVehicles.map((vehicle) => {
-                                    const isAssigned = vehicle.name !== '[VEÍCULO LIVRE]';
-                                    const driverName = isAssigned ? vehicle.name : 'Livre';
-                                    const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'Sem Equipa') : 'N/A';
-                                    return (
-                                        <React.Fragment key={vehicle.id}>
-                                        <TableRow>
-                                            <TableCell>{vehicle.licensePlate}</TableCell>
-                                            <TableCell>{vehicle.vehicleModel}</TableCell>
-                                            <TableCell className="font-medium">{driverName}</TableCell>
-                                            <TableCell>{teamName}</TableCell>
-                                            <TableCell className="text-right">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon">
-                                                            <MoreVertical className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onClick={() => openSubstituteDialog(vehicle)}>
-                                                            <Replace className="mr-2 h-4 w-4" />
-                                                            Gerir Substituição
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </TableCell>
-                                        </TableRow>
+                     {/* Mobile View: List of Cards */}
+                    <div className="space-y-4 md:hidden">
+                        {isLoading ? (
+                            [...Array(3)].map((_, i) => (
+                                <Card key={i}>
+                                    <CardHeader className="flex flex-row items-start justify-between">
+                                        <div>
+                                            <Skeleton className="h-6 w-24 mb-1" />
+                                            <Skeleton className="h-4 w-32" />
+                                        </div>
+                                        <Skeleton className="h-8 w-8" />
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        <div className="flex justify-between">
+                                            <Skeleton className="h-4 w-16" />
+                                            <Skeleton className="h-4 w-24" />
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <Skeleton className="h-4 w-12" />
+                                            <Skeleton className="h-4 w-20" />
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))
+                        ) : (
+                            sortedVehicles.map((vehicle) => {
+                                const isAssigned = vehicle.name !== '[VEÍCULO LIVRE]';
+                                const driverName = isAssigned ? vehicle.name : 'Livre';
+                                const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'Sem Equipa') : 'N/A';
+                                return (
+                                    <Card key={vehicle.id}>
+                                        <CardHeader className="flex flex-row items-center justify-between pb-4">
+                                            <div>
+                                                <CardTitle>{vehicle.licensePlate}</CardTitle>
+                                                <CardDescription>{vehicle.vehicleModel}</CardDescription>
+                                            </div>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon">
+                                                        <MoreVertical className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => openSubstituteDialog(vehicle)}>
+                                                        <Replace className="mr-2 h-4 w-4" />
+                                                        Gerir Substituição
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2 text-sm">
+                                             <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Motorista</span>
+                                                <span className="font-medium">{driverName}</span>
+                                            </div>
+                                             <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Equipa</span>
+                                                <span className="font-medium">{teamName}</span>
+                                            </div>
+                                        </CardContent>
                                         {vehicle.substituteVehicle && (
-                                            <TableRow className="bg-muted/20 hover:bg-muted/40">
-                                                <TableCell colSpan={5} className="py-2 px-4">
-                                                    <div className="flex items-center gap-4 pl-4 border-l-4 border-amber-500">
-                                                        <Replace className="h-5 w-5 text-amber-500" />
-                                                        <div>
-                                                            <p className="font-semibold text-amber-500">Veículo de Substituição</p>
-                                                            <p className="text-sm text-muted-foreground">
-                                                                {vehicle.substituteVehicle.licensePlate} - {vehicle.substituteVehicle.vehicleModel}
-                                                            </p>
-                                                        </div>
+                                            <CardFooter className="pt-4 mt-4 border-t bg-muted/20">
+                                                <div className="flex w-full items-start gap-3 text-amber-500">
+                                                    <Replace className="h-5 w-5 mt-0.5 shrink-0" />
+                                                    <div>
+                                                        <p className="font-semibold">Veículo de Substituição</p>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            {vehicle.substituteVehicle.licensePlate} - {vehicle.substituteVehicle.vehicleModel}
+                                                        </p>
                                                     </div>
+                                                </div>
+                                            </CardFooter>
+                                        )}
+                                    </Card>
+                                )
+                            })
+                        )}
+                    </div>
+
+                    {/* Desktop View: Table */}
+                    <div className="hidden md:block">
+                        <Table>
+                            <TableHeader>
+                            <TableRow>
+                                <TableHead>Matrícula</TableHead>
+                                <TableHead>Modelo do Veículo</TableHead>
+                                <TableHead>Motorista</TableHead>
+                                <TableHead>Equipa</TableHead>
+                                <TableHead className="text-right">Ações</TableHead>
+                            </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoading ? (
+                                    [...Array(5)].map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-36" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-28" /></TableCell>
+                                            <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    sortedVehicles.map((vehicle) => {
+                                        const isAssigned = vehicle.name !== '[VEÍCULO LIVRE]';
+                                        const driverName = isAssigned ? vehicle.name : 'Livre';
+                                        const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'Sem Equipa') : 'N/A';
+                                        return (
+                                            <React.Fragment key={vehicle.id}>
+                                            <TableRow>
+                                                <TableCell>{vehicle.licensePlate}</TableCell>
+                                                <TableCell>{vehicle.vehicleModel}</TableCell>
+                                                <TableCell className="font-medium">{driverName}</TableCell>
+                                                <TableCell>{teamName}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon">
+                                                                <MoreVertical className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem onClick={() => openSubstituteDialog(vehicle)}>
+                                                                <Replace className="mr-2 h-4 w-4" />
+                                                                Gerir Substituição
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </TableCell>
                                             </TableRow>
-                                        )}
-                                        </React.Fragment>
-                                    )
-                                })
-                            )}
-                        </TableBody>
-                      </Table>
+                                            {vehicle.substituteVehicle && (
+                                                <TableRow className="bg-muted/20 hover:bg-muted/40">
+                                                    <TableCell colSpan={5} className="py-2 px-4">
+                                                        <div className="flex items-center gap-4 pl-4 border-l-4 border-amber-500">
+                                                            <Replace className="h-5 w-5 text-amber-500" />
+                                                            <div>
+                                                                <p className="font-semibold text-amber-500">Veículo de Substituição</p>
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    {vehicle.substituteVehicle.licensePlate} - {vehicle.substituteVehicle.vehicleModel}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                            </React.Fragment>
+                                        )
+                                    })
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </TabsContent>
                 <TabsContent value="history" className="mt-4">
                     <div className="flex justify-end mb-4">
@@ -738,34 +820,67 @@ const VehiclesManagement = () => {
                             Exportar Histórico para PDF
                         </Button>
                     </div>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Data</TableHead>
-                                <TableHead>Motorista</TableHead>
-                                <TableHead>Descrição</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {isLoading ? (
-                                [...Array(5)].map((_, i) => (
-                                    <TableRow key={i}>
-                                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                                        <TableCell><Skeleton className="h-5 w-36" /></TableCell>
-                                        <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                changeLog.map((log) => (
-                                    <TableRow key={log.id}>
-                                        <TableCell>{format(new Date(log.date), "dd/MM/yyyy HH:mm")}</TableCell>
-                                        <TableCell className="font-medium">{log.driverName}</TableCell>
-                                        <TableCell>{log.changeDescription}</TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
+
+                     {/* Mobile History View */}
+                    <div className="space-y-4 md:hidden">
+                         {isLoading ? (
+                            [...Array(3)].map((_, i) => (
+                                 <Card key={i}>
+                                     <CardContent className="p-4 space-y-2">
+                                        <div className="flex justify-between">
+                                            <Skeleton className="h-5 w-32" />
+                                            <Skeleton className="h-4 w-24" />
+                                        </div>
+                                         <Skeleton className="h-4 w-full" />
+                                     </CardContent>
+                                 </Card>
+                            ))
+                         ) : (
+                            changeLog.map((log) => (
+                                <Card key={log.id}>
+                                    <CardContent className="p-4 space-y-2">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="font-medium">{log.driverName}</span>
+                                            <span className="text-xs text-muted-foreground">{format(new Date(log.date), "dd/MM/yy HH:mm")}</span>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">{log.changeDescription}</p>
+                                    </CardContent>
+                                </Card>
+                            ))
+                         )}
+                    </div>
+
+                    {/* Desktop History View */}
+                    <div className="hidden md:block">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Data</TableHead>
+                                    <TableHead>Motorista</TableHead>
+                                    <TableHead>Descrição</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoading ? (
+                                    [...Array(5)].map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-36" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    changeLog.map((log) => (
+                                        <TableRow key={log.id}>
+                                            <TableCell>{format(new Date(log.date), "dd/MM/yyyy HH:mm")}</TableCell>
+                                            <TableCell className="font-medium">{log.driverName}</TableCell>
+                                            <TableCell>{log.changeDescription}</TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </TabsContent>
             </Tabs>
         </CardContent>
@@ -803,7 +918,7 @@ const VehiclesManagement = () => {
                             </FormItem>
                         )}
                     />
-                    <DialogFooter className="grid grid-cols-2 gap-2 pt-4">
+                    <DialogFormFooter className="grid grid-cols-2 gap-2 pt-4">
                         {vehicleForSubstitute?.substituteVehicle && (
                             <Button variant="destructive" type="button" onClick={handleRemoveSubstitute}>
                                 <Trash2 className="mr-2 h-4 w-4" />
@@ -813,7 +928,7 @@ const VehiclesManagement = () => {
                         <Button type="submit" className={!vehicleForSubstitute?.substituteVehicle ? "col-span-2" : ""}>
                             Guardar
                         </Button>
-                    </DialogFooter>
+                    </DialogFormFooter>
                 </form>
             </Form>
         </DialogContent>
@@ -897,10 +1012,10 @@ const TeamsManagement = () => {
                     </FormItem>
                   )}
                 />
-                <DialogFooter>
+                <DialogFormFooter>
                   <Button variant="outline" type="button" onClick={() => setIsAddTeamDialogOpen(false)}>Cancelar</Button>
                   <Button type="submit">Adicionar Equipa</Button>
-                </DialogFooter>
+                </DialogFormFooter>
               </form>
             </Form>
           </DialogContent>
@@ -1052,7 +1167,7 @@ const CompetitionsManagement = () => {
                     Criar Competição
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Nova Competição</DialogTitle>
                     <DialogDescription>
@@ -1176,10 +1291,10 @@ const CompetitionsManagement = () => {
                             )} />
                         </div>
 
-                        <DialogFooter>
+                        <DialogFormFooter>
                             <Button variant="outline" type="button" onClick={() => setIsAddCompetitionDialogOpen(false)}>Cancelar</Button>
                             <Button type="submit">Criar Competição</Button>
-                        </DialogFooter>
+                        </DialogFormFooter>
                     </form>
                 </Form>
             </DialogContent>
@@ -1311,3 +1426,6 @@ export default function AdminPage() {
 
     
 
+
+
+    
