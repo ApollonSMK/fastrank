@@ -24,11 +24,13 @@ import { getLoggedInDriver, updateDriver } from "@/lib/data-service"
 import { Driver, Notification } from "@/lib/data-types"
 import { formatDistanceToNow } from "date-fns";
 import { pt } from 'date-fns/locale';
+import { useToast } from "@/hooks/use-toast";
 
 export default function Header() {
   const router = useRouter();
   const [driver, setDriver] = useState<Driver | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { toast } = useToast();
 
   // PWA Install state
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -48,12 +50,12 @@ export default function Header() {
 
     // PWA Install logic
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    setShowInstallButton(!isStandalone);
 
     if (isStandalone) {
       return;
     }
     
+    setShowInstallButton(true);
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(isIOSDevice);
     
@@ -96,7 +98,13 @@ export default function Header() {
       setShowIOSInstallModal(true);
       return;
     }
-    if (!installPrompt) return;
+    if (!installPrompt) {
+      toast({
+        title: "Instalação não disponível",
+        description: "O seu navegador ainda não preparou a aplicação para instalação. Por favor, aguarde um momento e tente novamente.",
+      });
+      return;
+    }
     installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
     if (outcome === 'accepted') {
@@ -122,7 +130,6 @@ export default function Header() {
                     className="rounded-full" 
                     onClick={handleInstallClick} 
                     title="Instalar Aplicação"
-                    disabled={!isIOS && !installPrompt}
                 >
                     <Download className="h-5 w-5" />
                 </Button>
