@@ -17,43 +17,6 @@ function docToObject<T>(doc: any): T {
 }
 
 // --- Auth Functions ---
-export async function signUpUser(driverData: Partial<Omit<Driver, 'id' | 'authUid'>>, password: string): Promise<void> {
-    if (!driverData.email || !driverData.name) {
-        throw new Error("Email and name are required for signup.");
-    }
-    const userCredential = await createUserWithEmailAndPassword(auth, driverData.email, password);
-    const user = userCredential.user;
-
-    const initialHistory: VehicleHistoryEntry = {
-        licensePlate: driverData.licensePlate || 'N/A',
-        vehicleModel: driverData.vehicleModel || 'N/A',
-        assignedDate: new Date().toISOString(),
-        unassignedDate: null,
-    };
-
-    const newDriver: Omit<Driver, 'id'> = {
-        authUid: user.uid,
-        name: driverData.name,
-        email: driverData.email,
-        avatar: driverData.avatar || '/avatars/default.png',
-        rank: 999,
-        points: 100,
-        moneyBalance: 0,
-        trips: 0,
-        safetyScore: 100,
-        efficiency: 100,
-        licensePlate: driverData.licensePlate || 'N/A',
-        vehicleModel: driverData.vehicleModel || 'N/A',
-        teamId: driverData.teamId || '',
-        dailyDeliveries: [],
-        notifications: [],
-        achievementIds: [],
-        licensePlateHistory: [initialHistory],
-    };
-    
-    await addDoc(collection(db, 'drivers'), newDriver);
-}
-
 export async function signInUser(email: string, password: string): Promise<void> {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
