@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from 'next/navigation';
-import { Bell, Car, Download, Share2, PlusSquare } from "lucide-react"
+import { Bell, Car } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -12,31 +12,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter
-} from '@/components/ui/dialog';
 import { getLoggedInDriver, updateDriver } from "@/lib/data-service"
 import { Driver, Notification } from "@/lib/data-types"
 import { formatDistanceToNow } from "date-fns";
 import { pt } from 'date-fns/locale';
-import { useToast } from "@/hooks/use-toast";
 
 export default function Header() {
   const router = useRouter();
   const [driver, setDriver] = useState<Driver | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const { toast } = useToast();
-
-  // PWA Install state
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
-  const [showInstallButton, setShowInstallButton] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
-  const [showIOSInstallModal, setShowIOSInstallModal] = useState(false);
 
   useEffect(() => {
     async function fetchDriver() {
@@ -47,29 +31,6 @@ export default function Header() {
         }
     }
     fetchDriver();
-
-    // PWA Install logic
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-
-    if (isStandalone) {
-      return;
-    }
-    
-    setShowInstallButton(true);
-    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    setIsIOS(isIOSDevice);
-    
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-
   }, []);
   
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -92,26 +53,6 @@ export default function Header() {
       router.push(notification.link);
     }
   }
-  
-  const handleInstallClick = async () => {
-    if (isIOS) {
-      setShowIOSInstallModal(true);
-      return;
-    }
-    if (!installPrompt) {
-      toast({
-        title: "Instalação não disponível",
-        description: "O seu navegador ainda não preparou a aplicação para instalação. Por favor, aguarde um momento e tente novamente.",
-      });
-      return;
-    }
-    installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setShowInstallButton(false);
-    }
-  };
-
 
   return (
     <>
@@ -123,17 +64,6 @@ export default function Header() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-            {showInstallButton && (
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="rounded-full" 
-                    onClick={handleInstallClick} 
-                    title="Instalar Aplicação"
-                >
-                    <Download className="h-5 w-5" />
-                </Button>
-            )}
             <DropdownMenu onOpenChange={handleOpenChange}>
             <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative rounded-full">
@@ -168,30 +98,6 @@ export default function Header() {
         </DropdownMenu>
         </div>
       </header>
-      
-      <Dialog open={showIOSInstallModal} onOpenChange={setShowIOSInstallModal}>
-        <DialogContent>
-            <DialogHeader>
-            <DialogTitle>Instalar a Aplicação</DialogTitle>
-            <DialogDescription>
-                Siga estes passos para adicionar a aplicação ao seu ecrã principal.
-            </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-2 text-sm">
-            <ol className="list-decimal list-inside space-y-3 rounded-md border p-4">
-              <li>
-                Toque no botão de <strong>Partilha</strong> (<Share2 className="inline-block h-4 w-4" />) no menu do seu navegador.
-              </li>
-              <li>
-                Deslize para baixo na lista de opções e toque em <strong>Adicionar ao ecrã principal</strong> (<PlusSquare className="inline-block h-4 w-4" />).
-              </li>
-            </ol>
-            </div>
-            <DialogFooter className="mt-2">
-            <Button onClick={() => setShowIOSInstallModal(false)} className="w-full">Percebi</Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

@@ -39,7 +39,8 @@ export default function InstallPwaPrompt() {
     };
     
     if (isIOSDevice) {
-        setShowInstallModal(true);
+        const timer = setTimeout(() => setShowInstallModal(true), 1500);
+        return () => clearTimeout(timer);
     } else {
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     }
