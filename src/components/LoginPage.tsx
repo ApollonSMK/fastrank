@@ -82,7 +82,7 @@ export default function LoginPage() {
                         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/40">
                             <Car className="h-8 w-8" />
                         </div>
-                        <CardTitle className="font-headline text-3xl font-black text-primary text-glow">Fastrack Ranking</CardTitle>
+                        <CardTitle className="font-headline text-3xl font-black text-primary text-glow">Fastrack</CardTitle>
                         <CardDescription>Bem-vindo! Faça login ou crie uma conta para começar.</CardDescription>
                     </CardHeader>
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full px-6 pb-6">
@@ -176,7 +176,7 @@ export default function LoginPage() {
                  </Card>
                 <div className="mt-4 space-y-2 text-center text-xs text-muted-foreground">
                     <p>
-                        Empresa de Frotas &copy; {new Date().getFullYear()}
+                        Fastrack Delivery Copyrights &copy; {new Date().getFullYear()}
                     </p>
                 </div>
             </main>

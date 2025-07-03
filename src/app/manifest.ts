@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next'
  
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Fastrack Ranking',
+    name: 'Fastrack',
     short_name: 'Fastrack',
     description: 'Ranking app for fleet drivers',
     start_url: '/',

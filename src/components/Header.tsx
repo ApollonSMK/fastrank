@@ -47,25 +47,22 @@ export default function Header() {
     fetchDriver();
 
     // PWA Install logic
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    setShowInstallButton(!isStandalone);
+
+    if (isStandalone) {
+      return;
+    }
+    
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(isIOSDevice);
+    
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setInstallPrompt(e);
-      if (!window.matchMedia('(display-mode: standalone)').matches) {
-        setShowInstallButton(true);
-      }
     };
 
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-        return;
-    }
-
-    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    setIsIOS(isIOSDevice);
-    if (isIOSDevice) {
-        setShowInstallButton(true);
-    } else {
-        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    }
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -114,12 +111,19 @@ export default function Header() {
         <div className="flex items-center gap-2">
           <Car className="h-6 w-6 text-primary" />
           <h1 className="font-headline text-xl font-black tracking-wider text-primary text-glow">
-            Fastrack Ranking
+            Fastrack
           </h1>
         </div>
         <div className="flex items-center gap-2">
             {showInstallButton && (
-                <Button variant="ghost" size="icon" className="rounded-full" onClick={handleInstallClick} title="Instalar Aplicação">
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="rounded-full" 
+                    onClick={handleInstallClick} 
+                    title="Instalar Aplicação"
+                    disabled={!isIOS && !installPrompt}
+                >
                     <Download className="h-5 w-5" />
                 </Button>
             )}
