@@ -69,7 +69,11 @@ type EditFormValues = z.infer<typeof editFormSchema>;
 
 const deliveryFormSchema = z.object({
   date: z.date({ required_error: "A data é obrigatória." }),
-  deliveries: z.coerce.number().min(0, "O número de entregas não pode ser negativo."),
+  deliveriesUber: z.coerce.number().min(0, "O número de entregas não pode ser negativo.").default(0),
+  deliveriesWedely: z.coerce.number().min(0, "O número de entregas não pode ser negativo.").default(0),
+}).refine(data => data.deliveriesUber > 0 || data.deliveriesWedely > 0, {
+  message: "Deve registar pelo menos uma entrega.",
+  path: ["deliveriesUber"],
 });
 type DeliveryFormValues = z.infer<typeof deliveryFormSchema>;
 
@@ -135,7 +139,8 @@ export default function TeamDetailsPage() {
   const deliveryForm = useForm<DeliveryFormValues>({
     resolver: zodResolver(deliveryFormSchema),
     defaultValues: {
-      deliveries: 0,
+      deliveriesUber: 0,
+      deliveriesWedely: 0,
     },
   });
 
@@ -342,9 +347,12 @@ export default function TeamDetailsPage() {
     const driverToUpdate = await getDriver(selectedDriverForDeliveries.id);
     if (!driverToUpdate) return;
 
+    const totalDeliveriesToday = data.deliveriesUber + data.deliveriesWedely;
+
     const newDelivery: DailyDelivery = {
       date: format(data.date, 'yyyy-MM-dd'),
-      deliveries: data.deliveries,
+      deliveriesUber: data.deliveriesUber,
+      deliveriesWedely: data.deliveriesWedely,
     };
 
     const existingDeliveryIndex = driverToUpdate.dailyDeliveries.findIndex(d => d.date === newDelivery.date);
@@ -361,12 +369,12 @@ export default function TeamDetailsPage() {
     newNotifications.unshift({
         id: Date.now(),
         title: "Entregas Atualizadas",
-        description: `Registo de ${data.deliveries} entregas para ${format(data.date, 'dd/MM/yyyy')} foi adicionado por um administrador.`,
+        description: `Registo de ${totalDeliveriesToday} entregas para ${format(data.date, 'dd/MM/yyyy')} foi adicionado por um administrador.`,
         read: false,
         date: new Date().toISOString(),
     });
 
-    const totalDeliveries = updatedDeliveries.reduce((sum, d) => sum + d.deliveries, 0);
+    const totalDeliveries = updatedDeliveries.reduce((sum, d) => sum + (d.deliveriesUber || 0) + (d.deliveriesWedely || 0), 0);
     const newAchievementIds = [...driverToUpdate.achievementIds];
     
     if (totalDeliveries >= 150 && !driverToUpdate.achievementIds.includes('delivery-150')) {
@@ -392,12 +400,12 @@ export default function TeamDetailsPage() {
       achievementIds: newAchievementIds,
     };
 
-    if (data.deliveries >= 20) {
+    if (totalDeliveriesToday >= 20) {
         updates.points = (driverToUpdate.points || 0) + 10;
         newNotifications.unshift({
             id: Date.now() + 2,
             title: "Bónus de Entregas!",
-            description: `Parabéns! Ganhou 10 pontos por fazer ${data.deliveries} entregas.`,
+            description: `Parabéns! Ganhou 10 pontos por fazer ${totalDeliveriesToday} entregas.`,
             read: false,
             date: new Date().toISOString(),
         });
@@ -723,7 +731,7 @@ export default function TeamDetailsPage() {
               </CardHeader>
               <CardContent>
                 <Form {...deliveryForm}>
-                  <form onSubmit={deliveryForm.handleSubmit(handleAddDelivery)} className="flex flex-col sm:flex-row sm:items-end gap-4">
+                  <form onSubmit={deliveryForm.handleSubmit(handleAddDelivery)} className="space-y-4">
                     <FormField
                       control={deliveryForm.control}
                       name="date"
@@ -765,19 +773,34 @@ export default function TeamDetailsPage() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={deliveryForm.control}
-                      name="deliveries"
-                      render={({ field }) => (
-                        <FormItem className="w-full sm:w-32">
-                          <FormLabel>Nº de Entregas</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="flex flex-col sm:flex-row gap-4">
+                        <FormField
+                            control={deliveryForm.control}
+                            name="deliveriesUber"
+                            render={({ field }) => (
+                                <FormItem className="w-full">
+                                <FormLabel>Nº de Entregas Uber</FormLabel>
+                                <FormControl>
+                                    <Input type="number" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={deliveryForm.control}
+                            name="deliveriesWedely"
+                            render={({ field }) => (
+                                <FormItem className="w-full">
+                                <FormLabel>Nº de Entregas Wedely</FormLabel>
+                                <FormControl>
+                                    <Input type="number" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
                     <Button type="submit" className="w-full sm:w-auto">Adicionar</Button>
                   </form>
                 </Form>
@@ -793,22 +816,29 @@ export default function TeamDetailsPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Data</TableHead>
-                                    <TableHead>Entregas</TableHead>
+                                    <TableHead className="text-center">Uber</TableHead>
+                                    <TableHead className="text-center">Wedely</TableHead>
+                                    <TableHead className="text-center">Total</TableHead>
                                     <TableHead className="text-right">Ação</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {selectedDriverForDeliveries.dailyDeliveries.map(delivery => (
-                                    <TableRow key={delivery.date}>
-                                        <TableCell>{format(new Date(delivery.date), "dd/MM/yyyy")}</TableCell>
-                                        <TableCell>{delivery.deliveries}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Button variant="ghost" size="icon" onClick={() => handleRemoveDelivery(delivery.date)}>
-                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                {selectedDriverForDeliveries.dailyDeliveries.map(delivery => {
+                                    const total = (delivery.deliveriesUber || 0) + (delivery.deliveriesWedely || 0);
+                                    return (
+                                        <TableRow key={delivery.date}>
+                                            <TableCell>{format(new Date(delivery.date), "dd/MM/yyyy")}</TableCell>
+                                            <TableCell className="text-center">{delivery.deliveriesUber || 0}</TableCell>
+                                            <TableCell className="text-center">{delivery.deliveriesWedely || 0}</TableCell>
+                                            <TableCell className="text-center font-bold">{total}</TableCell>
+                                            <TableCell className="text-right">
+                                                <Button variant="ghost" size="icon" onClick={() => handleRemoveDelivery(delivery.date)}>
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     ) : (

@@ -1,7 +1,8 @@
 
 export type DailyDelivery = {
   date: string;
-  deliveries: number;
+  deliveriesUber: number;
+  deliveriesWedely: number;
 };
 
 export type Achievement = {
