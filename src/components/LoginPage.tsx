@@ -22,7 +22,7 @@ export default function LoginPage() {
     const [rememberMe, setRememberMe] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setIsLoading(true);
         try {
