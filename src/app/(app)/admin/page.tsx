@@ -211,7 +211,7 @@ const DriversManagement = () => {
             const driverDoc = await getDriver(driverToEdit.id);
             const freeVehicleDoc = await getDriver(data.vehicleId);
 
-            if (!driverDoc || !freeVehicleDoc || freeVehicleDoc.name !== '[VEÍCULO LIVRE]') {
+            if (!driverDoc || !freeVehicleDoc || freeVehicleDoc.name !== '[VEÍCulo LIVRE]') {
                 console.error("Invalid vehicle swap operation.");
                 return;
             }
@@ -539,16 +539,11 @@ const VehiclesManagement = () => {
     
     doc.text(`Lista de Veículos e Motoristas - ${today}`, 14, 16);
 
-    const sortedVehicles = [...vehicles].sort((a, b) => {
-        const teamA = teamsMap.get(a.teamId || '') || 'zzz'; // place no team at the end
-        const teamB = teamsMap.get(b.teamId || '') || 'zzz';
-        if (teamA < teamB) return -1;
-        if (teamA > teamB) return 1;
-        return a.licensePlate.localeCompare(b.licensePlate);
-    });
+    // Sort vehicles by license plate for the PDF
+    const sortedVehiclesForPdf = [...vehicles].sort((a, b) => a.licensePlate.localeCompare(b.licensePlate));
 
     const bodyData: (string | { content: string, styles: { fontStyle: 'italic', textColor: number[] } })[][] = [];
-    sortedVehicles.forEach(vehicle => {
+    sortedVehiclesForPdf.forEach(vehicle => {
         const isAssigned = vehicle.name !== '[VEÍCULO LIVRE]';
         const driverName = isAssigned ? vehicle.name : 'Livre';
         const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'Sem Equipa') : 'N/A';
@@ -574,6 +569,8 @@ const VehiclesManagement = () => {
         head: [['Matrícula', 'Modelo do Veículo', 'Motorista', 'Equipa']],
         body: bodyData,
         headStyles: { fillColor: [45, 100, 51] },
+        // Reduce font size and padding to fit more content on one page
+        styles: { fontSize: 8, cellPadding: 2 },
         theme: 'striped',
     });
 
