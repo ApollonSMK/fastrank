@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Team, Competition, Driver, FleetChangeLog, VehicleHistoryEntry } from "@/lib/data-types";
-import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition, getFleetChangeLog, updateDriver, getDriver, deleteDriver, addFreeVehicle, addFleetChangeLog } from "@/lib/data-service";
+import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition, getFleetChangeLog, updateDriver, getDriver, deleteDriver, addFreeVehicle, addFleetChangeLog, assignDriverToVehicle } from "@/lib/data-service";
 import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart, Trash2, Car, FileDown, Contact, History, Edit, Replace } from "lucide-react";
 import {
   DropdownMenu,
@@ -80,6 +80,15 @@ const competitionFormSchema = z.object({
   enrollmentCost: z.coerce.number().min(0, { message: "O custo de inscrição não pode ser negativo." }),
 });
 
+const addDriverFormSchema = z.object({
+  name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
+  emailUsername: z.string().min(1, { message: 'O nome de utilizador do email é obrigatório.' }),
+  password: z.string().min(6, { message: 'A senha deve ter pelo menos 6 caracteres.' }),
+  vehicleId: z.string().min(1, { message: 'É obrigatório selecionar um veículo.' }),
+  teamId: z.string({ required_error: "É obrigatório selecionar uma equipa." }).min(1, "É obrigatório selecionar uma equipa."),
+});
+type AddDriverFormValues = z.infer<typeof addDriverFormSchema>;
+
 const editDriverFormSchema = z.object({
   name: z.string().min(2, { message: 'O nome deve ter pelo menos 2 caracteres.' }),
   vehicleId: z.string().min(1, { message: "É obrigatório selecionar um veículo." }),
@@ -127,6 +136,7 @@ const DriversManagement = () => {
     const [freeVehicles, setFreeVehicles] = useState<Driver[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    const [isAddDriverDialogOpen, setIsAddDriverDialogOpen] = useState(false);
     const [driverToEdit, setDriverToEdit] = useState<Driver | null>(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
@@ -150,10 +160,38 @@ const DriversManagement = () => {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+    
+    const addDriverForm = useForm<AddDriverFormValues>({
+        resolver: zodResolver(addDriverFormSchema),
+    });
 
     const editForm = useForm<EditDriverFormValues>({
         resolver: zodResolver(editDriverFormSchema),
     });
+
+    const onAddDriverSubmit: SubmitHandler<AddDriverFormValues> = async (data) => {
+        const newDriverData = {
+          name: data.name,
+          email: `${data.emailUsername}@fastrack.lu`,
+          teamId: data.teamId,
+        };
+        
+        try {
+            await assignDriverToVehicle(data.vehicleId, newDriverData, data.password);
+            addDriverForm.reset();
+            setIsAddDriverDialogOpen(false);
+            fetchData();
+        } catch (error: any) {
+            if (error.code === 'auth/email-already-in-use') {
+                addDriverForm.setError('emailUsername', {
+                    type: 'manual',
+                    message: 'Este email já está registado.'
+                });
+            } else {
+                console.error("Error creating user:", error);
+            }
+        }
+    };
 
     const openEditDialog = (driver: Driver) => {
         setDriverToEdit(driver);
@@ -279,7 +317,13 @@ const DriversManagement = () => {
             <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                     <span>Todos os Motoristas</span>
-                     {!isLoading && <Badge variant="outline">{drivers.length} Total</Badge>}
+                    <div className="flex items-center gap-4">
+                        {!isLoading && <Badge variant="outline">{drivers.length} Total</Badge>}
+                        <Button onClick={() => setIsAddDriverDialogOpen(true)}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Adicionar Motorista
+                        </Button>
+                    </div>
                 </CardTitle>
                 <p className="text-sm text-muted-foreground pt-1.5">Consulte e gira todos os motoristas registados.</p>
             </CardHeader>
@@ -348,6 +392,85 @@ const DriversManagement = () => {
                 </Table>
             </CardContent>
         </Card>
+
+        <Dialog open={isAddDriverDialogOpen} onOpenChange={setIsAddDriverDialogOpen}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>Adicionar Novo Motorista</DialogTitle>
+                    <DialogDescription>
+                        Crie um novo motorista, associe-o a um veículo livre e a uma equipa.
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...addDriverForm}>
+                    <form onSubmit={addDriverForm.handleSubmit(onAddDriverSubmit)} className="space-y-4 py-4">
+                         <FormField control={addDriverForm.control} name="name" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Nome</FormLabel>
+                                <FormControl><Input placeholder="Nome completo do motorista" {...field} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={addDriverForm.control} name="teamId" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Equipa</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione uma equipa" /></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        {teams.map(team => <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={addDriverForm.control} name="vehicleId" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Veículo Livre</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione um veículo livre" /></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        {freeVehicles.length > 0 ? (
+                                            freeVehicles.map(v => (
+                                                <SelectItem key={v.id} value={v.id}>
+                                                    {v.licensePlate} - {v.vehicleModel}
+                                                </SelectItem>
+                                            ))
+                                        ) : (
+                                            <SelectItem value="none" disabled>Não há veículos livres</SelectItem>
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={addDriverForm.control} name="emailUsername" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                    <div className="flex items-center gap-2">
+                                    <Input placeholder="joao.silva" {...field} />
+                                    <span className="text-muted-foreground">@fastrack.lu</span>
+                                    </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={addDriverForm.control} name="password" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Senha</FormLabel>
+                                <FormControl>
+                                    <Input type="password" placeholder="••••••••" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <DialogFormFooter>
+                            <Button variant="outline" type="button" onClick={() => setIsAddDriverDialogOpen(false)}>Cancelar</Button>
+                            <Button type="submit" disabled={addDriverForm.formState.isSubmitting}>Adicionar Motorista</Button>
+                        </DialogFormFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
         
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => { setIsEditDialogOpen(isOpen); if (!isOpen) setDriverToEdit(null); }}>
             <DialogContent>
