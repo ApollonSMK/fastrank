@@ -99,6 +99,12 @@ const substituteVehicleFormSchema = z.object({
 });
 type SubstituteVehicleFormValues = z.infer<typeof substituteVehicleFormSchema>;
 
+const editVehicleFormSchema = z.object({
+    licensePlate: z.string().min(1, { message: "A matrícula é obrigatória." }),
+    vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
+});
+type EditVehicleFormValues = z.infer<typeof editVehicleFormSchema>;
+
 
 const StatisticsManagement = () => {
   return (
@@ -211,7 +217,7 @@ const DriversManagement = () => {
             const driverDoc = await getDriver(driverToEdit.id);
             const freeVehicleDoc = await getDriver(data.vehicleId);
 
-            if (!driverDoc || !freeVehicleDoc || freeVehicleDoc.name !== '[VEÍCulo LIVRE]') {
+            if (!driverDoc || !freeVehicleDoc || freeVehicleDoc.name !== '[VEÍCULO LIVRE]') {
                 console.error("Invalid vehicle swap operation.");
                 return;
             }
@@ -418,10 +424,14 @@ const VehiclesManagement = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [changeLog, setChangeLog] = useState<FleetChangeLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
   const [isAddVehicleDialogOpen, setIsAddVehicleDialogOpen] = useState(false);
   const [isSubstituteDialogOpen, setIsSubstituteDialogOpen] = useState(false);
   const [vehicleForSubstitute, setVehicleForSubstitute] = useState<Driver | null>(null);
   
+  const [isEditVehicleDialogOpen, setIsEditVehicleDialogOpen] = useState(false);
+  const [vehicleToEdit, setVehicleToEdit] = useState<Driver | null>(null);
+
   const [vehicleToDelete, setVehicleToDelete] = useState<Driver | null>(null);
   const [isDeleteVehicleDialogOpen, setIsDeleteVehicleDialogOpen] = useState(false);
 
@@ -457,6 +467,10 @@ const VehiclesManagement = () => {
   const substituteVehicleForm = useForm<SubstituteVehicleFormValues>({
     resolver: zodResolver(substituteVehicleFormSchema),
   });
+  
+  const editVehicleForm = useForm<EditVehicleFormValues>({
+    resolver: zodResolver(editVehicleFormSchema),
+  });
 
   const onAddVehicleSubmit: SubmitHandler<AddVehicleFormValues> = async (data) => {
     const plateExists = vehicles.some(v => v.licensePlate.toUpperCase() === data.licensePlate.toUpperCase());
@@ -482,6 +496,90 @@ const VehiclesManagement = () => {
         });
         setIsSubstituteDialogOpen(true);
     };
+
+    const openEditVehicleDialog = (vehicle: Driver) => {
+        setVehicleToEdit(vehicle);
+        editVehicleForm.reset({
+            licensePlate: vehicle.licensePlate,
+            vehicleModel: vehicle.vehicleModel,
+        });
+        setIsEditVehicleDialogOpen(true);
+    };
+
+    const onEditVehicleSubmit: SubmitHandler<EditVehicleFormValues> = async (data) => {
+        if (!vehicleToEdit) return;
+
+        const newPlate = data.licensePlate.toUpperCase();
+        if (newPlate !== vehicleToEdit.licensePlate.toUpperCase()) {
+            const plateExists = vehicles.some(v =>
+                v.id !== vehicleToEdit.id &&
+                v.licensePlate.toUpperCase() === newPlate
+            );
+            if (plateExists) {
+                editVehicleForm.setError("licensePlate", {
+                    type: "manual",
+                    message: "Esta matrícula já existe na frota."
+                });
+                return;
+            }
+        }
+
+        const currentVehicle = await getDriver(vehicleToEdit.id);
+        if (!currentVehicle) return;
+
+        const plateChanged = currentVehicle.licensePlate.toUpperCase() !== data.licensePlate.toUpperCase();
+        const modelChanged = currentVehicle.vehicleModel !== data.vehicleModel;
+
+        if (!plateChanged && !modelChanged) {
+            setIsEditVehicleDialogOpen(false);
+            setVehicleToEdit(null);
+            return;
+        }
+
+        const updates: Partial<Driver> = {
+          licensePlate: data.licensePlate.toUpperCase(),
+          vehicleModel: data.vehicleModel,
+        };
+        
+        const changeDescriptions: string[] = [];
+        
+        const updatedHistory = [...(currentVehicle.licensePlateHistory || [])];
+        const lastEntry = updatedHistory.find(entry => entry.unassignedDate === null);
+        
+        if (lastEntry) {
+            lastEntry.unassignedDate = new Date().toISOString();
+        }
+
+        updatedHistory.push({
+            licensePlate: data.licensePlate.toUpperCase(),
+            vehicleModel: data.vehicleModel,
+            assignedDate: new Date().toISOString(),
+            unassignedDate: null,
+        });
+        updates.licensePlateHistory = updatedHistory;
+        
+        if (plateChanged) {
+            changeDescriptions.push(`Matrícula alterada de "${currentVehicle.licensePlate}" para "${data.licensePlate.toUpperCase()}".`);
+        }
+        if (modelChanged) {
+            changeDescriptions.push(`Modelo do veículo alterado de "${currentVehicle.vehicleModel}" para "${data.vehicleModel}".`);
+        }
+
+        await updateDriver(vehicleToEdit.id, updates);
+
+        if (changeDescriptions.length > 0) {
+            await addFleetChangeLog({
+                driverId: vehicleToEdit.id,
+                driverName: currentVehicle.name,
+                changeDescription: `Dados do veículo ${currentVehicle.licensePlate} alterados. ${changeDescriptions.join(' ')}`
+            });
+        }
+
+        setIsEditVehicleDialogOpen(false);
+        setVehicleToEdit(null);
+        fetchData();
+    };
+
 
     const onAddSubstituteSubmit: SubmitHandler<SubstituteVehicleFormValues> = async (data) => {
         if (!vehicleForSubstitute) return;
@@ -526,6 +624,13 @@ const VehiclesManagement = () => {
 
     const handleDeleteVehicle = async () => {
         if (!vehicleToDelete) return;
+        
+        await addFleetChangeLog({
+            driverId: vehicleToDelete.id,
+            driverName: '[ADMIN]',
+            changeDescription: `Veículo ${vehicleToDelete.licensePlate} (${vehicleToDelete.vehicleModel}) removido permanentemente da frota.`
+        });
+
         await deleteDriver(vehicleToDelete.id);
         setIsDeleteVehicleDialogOpen(false);
         setVehicleToDelete(null);
@@ -539,7 +644,6 @@ const VehiclesManagement = () => {
     
     doc.text(`Lista de Veículos e Motoristas - ${today}`, 14, 16);
 
-    // Sort vehicles by license plate for the PDF
     const sortedVehiclesForPdf = [...vehicles].sort((a, b) => a.licensePlate.localeCompare(b.licensePlate));
 
     const bodyData: (string | { content: string, styles: { fontStyle: 'italic', textColor: number[] } })[][] = [];
@@ -569,7 +673,6 @@ const VehiclesManagement = () => {
         head: [['Matrícula', 'Modelo do Veículo', 'Motorista', 'Equipa']],
         body: bodyData,
         headStyles: { fillColor: [45, 100, 51] },
-        // Reduce font size and padding to fit more content on one page
         styles: { fontSize: 8, cellPadding: 2 },
         theme: 'striped',
     });
@@ -702,7 +805,7 @@ const VehiclesManagement = () => {
                             sortedVehicles.map((vehicle) => {
                                 const isAssigned = vehicle.name !== '[VEÍCULO LIVRE]';
                                 const driverName = isAssigned ? vehicle.name : 'Livre';
-                                const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'Sem Equipa') : 'N/A';
+                                const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'N/A') : 'N/A';
                                 return (
                                     <Card key={vehicle.id}>
                                         <CardHeader className="flex flex-row items-center justify-between pb-4">
@@ -717,6 +820,10 @@ const VehiclesManagement = () => {
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => openEditVehicleDialog(vehicle)}>
+                                                        <Edit className="mr-2 h-4 w-4" />
+                                                        Editar Veículo
+                                                    </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => openSubstituteDialog(vehicle)}>
                                                         <Replace className="mr-2 h-4 w-4" />
                                                         Gerir Substituição
@@ -795,7 +902,7 @@ const VehiclesManagement = () => {
                                     sortedVehicles.map((vehicle) => {
                                         const isAssigned = vehicle.name !== '[VEÍCULO LIVRE]';
                                         const driverName = isAssigned ? vehicle.name : 'Livre';
-                                        const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'Sem Equipa') : 'N/A';
+                                        const teamName = isAssigned ? (teamsMap.get(vehicle.teamId || '') || 'N/A') : 'N/A';
                                         return (
                                             <React.Fragment key={vehicle.id}>
                                             <TableRow>
@@ -811,6 +918,10 @@ const VehiclesManagement = () => {
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem onClick={() => openEditVehicleDialog(vehicle)}>
+                                                                <Edit className="mr-2 h-4 w-4" />
+                                                                Editar Veículo
+                                                            </DropdownMenuItem>
                                                             <DropdownMenuItem onClick={() => openSubstituteDialog(vehicle)}>
                                                                 <Replace className="mr-2 h-4 w-4" />
                                                                 Gerir Substituição
@@ -978,6 +1089,47 @@ const VehiclesManagement = () => {
         </DialogContent>
     </Dialog>
     
+    <Dialog open={isEditVehicleDialogOpen} onOpenChange={setIsEditVehicleDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Editar Veículo: {vehicleToEdit?.licensePlate}</DialogTitle>
+                <DialogDescription>
+                    Atualize a matrícula ou o modelo do veículo. Esta ação será registada.
+                </DialogDescription>
+            </DialogHeader>
+            <Form {...editVehicleForm}>
+                <form onSubmit={editVehicleForm.handleSubmit(onEditVehicleSubmit)} className="space-y-4 py-4">
+                    <FormField
+                        control={editVehicleForm.control}
+                        name="licensePlate"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Matrícula</FormLabel>
+                            <FormControl><Input placeholder="Ex: AB-12-CD" {...field} /></FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={editVehicleForm.control}
+                        name="vehicleModel"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Modelo do Veículo</FormLabel>
+                            <FormControl><Input placeholder="Ex: Renault Clio" {...field} /></FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <DialogFormFooter>
+                        <Button variant="outline" type="button" onClick={() => setIsEditVehicleDialogOpen(false)}>Cancelar</Button>
+                        <Button type="submit">Guardar Alterações</Button>
+                    </DialogFormFooter>
+                </form>
+            </Form>
+        </DialogContent>
+    </Dialog>
+
     <AlertDialog open={isDeleteVehicleDialogOpen} onOpenChange={setIsDeleteVehicleDialogOpen}>
         <AlertDialogContent>
             <AlertDialogHeader>
@@ -1480,3 +1632,7 @@ export default function AdminPage() {
     </>
   );
 }
+
+    
+
+    
