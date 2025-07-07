@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Team, Competition, Driver, FleetChangeLog, VehicleHistoryEntry } from "@/lib/data-types";
 import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition, getFleetChangeLog, updateDriver, getDriver, deleteDriver, addFreeVehicle, addFleetChangeLog, assignDriverToVehicle } from "@/lib/data-service";
-import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2 as BarChart, Trash2, Car, FileDown, Contact, History, Edit, Replace } from "lucide-react";
+import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2, Trash2, Car, FileDown, Contact, History, Edit, Replace } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,6 +60,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 
 const teamFormSchema = z.object({
@@ -116,15 +118,144 @@ type EditVehicleFormValues = z.infer<typeof editVehicleFormSchema>;
 
 
 const StatisticsManagement = () => {
+  const [stats, setStats] = useState({
+    activeDrivers: 0,
+    freeVehicles: 0,
+    totalTeams: 0,
+    totalDeliveries: 0,
+  });
+  const [teamDeliveries, setTeamDeliveries] = useState<{ name: string; total: number }[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    const [driversData, teamsData] = await Promise.all([
+        getAllDrivers(),
+        getAllTeams(),
+    ]);
+
+    const activeDrivers = driversData.filter(d => d.name !== '[VEÍCULO LIVRE]' && d.email !== 'info@fastrack.lu');
+    const freeVehicles = driversData.filter(d => d.name === '[VEÍCULO LIVRE]');
+    
+    const totalDeliveries = activeDrivers.reduce((sum, driver) => {
+        return sum + driver.dailyDeliveries.reduce((deliverySum, day) => deliverySum + day.deliveries, 0);
+    }, 0);
+
+    setStats({
+      activeDrivers: activeDrivers.length,
+      freeVehicles: freeVehicles.length,
+      totalTeams: teamsData.length,
+      totalDeliveries: totalDeliveries,
+    });
+    
+    const teamsMap = new Map(teamsData.map(t => [t.id, { name: t.name, total: 0 }]));
+    
+    activeDrivers.forEach(driver => {
+        if (driver.teamId && teamsMap.has(driver.teamId)) {
+            const teamData = teamsMap.get(driver.teamId)!;
+            teamData.total += driver.dailyDeliveries.reduce((sum, day) => sum + day.deliveries, 0);
+            teamsMap.set(driver.teamId, teamData);
+        }
+    });
+    
+    const chartData = Array.from(teamsMap.values())
+      .sort((a, b) => b.total - a.total);
+    
+    setTeamDeliveries(chartData);
+
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  if (isLoading) {
+      return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Estatísticas Gerais</CardTitle>
+                <p className="text-sm text-muted-foreground pt-1.5">A carregar dados...</p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <Skeleton className="h-28 rounded-lg" />
+                    <Skeleton className="h-28 rounded-lg" />
+                    <Skeleton className="h-28 rounded-lg" />
+                    <Skeleton className="h-28 rounded-lg" />
+                </div>
+                <Skeleton className="h-80 rounded-lg" />
+            </CardContent>
+        </Card>
+      )
+  }
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Estatísticas Gerais</CardTitle>
-        <p className="text-sm text-muted-foreground pt-1.5">Visão geral do desempenho da frota.</p>
-      </CardHeader>
-      <CardContent>
-        <p className="text-center text-muted-foreground py-8">O conteúdo das estatísticas será adicionado aqui em breve.</p>
-      </CardContent>
+        <CardHeader>
+            <CardTitle>Estatísticas Gerais</CardTitle>
+            <p className="text-sm text-muted-foreground pt-1.5">Visão geral do desempenho da frota.</p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Motoristas Ativos</CardTitle>
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats.activeDrivers}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Veículos Livres</CardTitle>
+                        <Car className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats.freeVehicles}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total de Equipas</CardTitle>
+                        <Swords className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats.totalTeams}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total de Entregas</CardTitle>
+                        <BarChart2 className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats.totalDeliveries.toLocaleString()}</div>
+                    </CardContent>
+                </Card>
+            </div>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle>Entregas por Equipa</CardTitle>
+                    <CardDescription>Total de entregas realizadas por cada equipa.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                     <ChartContainer config={{ total: { label: 'Entregas', color: 'hsl(var(--primary))' } }} className="h-[300px] w-full">
+                        <ResponsiveContainer>
+                            <BarChart data={teamDeliveries} margin={{ top: 20, right: 20, bottom: 5, left: -20 }}>
+                                <CartesianGrid vertical={false} />
+                                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
+                                <YAxis />
+                                <ChartTooltip content={<ChartTooltipContent />} />
+                                <Bar dataKey="total" fill="var(--color-total)" radius={4} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </ChartContainer>
+                </CardContent>
+            </Card>
+        </CardContent>
     </Card>
   );
 };
@@ -1730,7 +1861,7 @@ export default function AdminPage() {
         <h2 className="font-headline text-2xl font-bold">Painel de Admin</h2>
         <Tabs defaultValue="statistics" className="space-y-4">
             <TabsList className="w-full justify-start overflow-x-auto sm:w-auto sm:justify-center hide-scrollbar">
-                <TabsTrigger value="statistics"><BarChart className="mr-2 h-4 w-4" /> Estatísticas</TabsTrigger>
+                <TabsTrigger value="statistics"><BarChart2 className="mr-2 h-4 w-4" /> Estatísticas</TabsTrigger>
                 <TabsTrigger value="drivers"><Contact className="mr-2 h-4 w-4" /> Motoristas</TabsTrigger>
                 <TabsTrigger value="teams"><Users className="mr-2 h-4 w-4" /> Equipas</TabsTrigger>
                 <TabsTrigger value="competitions"><Swords className="mr-2 h-4 w-4" /> Competições</TabsTrigger>
@@ -1759,3 +1890,4 @@ export default function AdminPage() {
     
 
     
+
