@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Driver, DailyDelivery, Team, achievements } from '@/lib/data-types';
-import { getAllDrivers, getAllTeams, getDriver, updateDriver } from '@/lib/data-service';
+import { getAllDrivers, getAllTeams, getDriver, updateDriver, getLoggedInDriver } from '@/lib/data-service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Trophy, Award, Medal, TrendingUp, Route, ShieldCheck, Fuel, Calendar as CalendarIcon, PlusCircle, Trash2, Rocket, CalendarDays, Wallet, Star } from 'lucide-react';
@@ -268,12 +268,20 @@ export default function DashboardPage() {
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const [date, setDate] = useState<DateRange | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
-    const [driversData, teamsData] = await Promise.all([getAllDrivers(), getAllTeams()]);
+    const [driversData, teamsData, loggedInDriver] = await Promise.all([
+        getAllDrivers(), 
+        getAllTeams(),
+        getLoggedInDriver()
+    ]);
     setDrivers(driversData);
     setTeams(teamsData);
+    if (loggedInDriver && loggedInDriver.email === 'info@fastrack.lu') {
+      setIsAdmin(true);
+    }
     setIsLoading(false);
   }, []);
 
@@ -557,9 +565,11 @@ export default function DashboardPage() {
                             <Progress value={weeklyProgress} className="h-2" />
                           </div>
                         </div>
-                        <Button variant="ghost" size="icon" className="shrink-0" onClick={(e) => openDeliveriesDialog(e, driver as Driver)}>
-                            <PlusCircle className="h-5 w-5" />
-                        </Button>
+                        {isAdmin && (
+                            <Button variant="ghost" size="icon" className="shrink-0" onClick={(e) => openDeliveriesDialog(e, driver as Driver)}>
+                                <PlusCircle className="h-5 w-5" />
+                            </Button>
+                        )}
                       </CardContent>
                     </Card>
                   </DialogTrigger>
