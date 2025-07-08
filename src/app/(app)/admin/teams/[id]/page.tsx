@@ -72,7 +72,8 @@ const deliveryFormSchema = z.object({
   deliveriesUber: z.coerce.number().min(0, "O número de entregas não pode ser negativo.").default(0),
   deliveriesWedely: z.coerce.number().min(0, "O número de entregas não pode ser negativo.").default(0),
   deliveriesSushishop: z.coerce.number().min(0, "O número de entregas não pode ser negativo.").default(0),
-}).refine(data => data.deliveriesUber > 0 || data.deliveriesWedely > 0 || data.deliveriesSushishop > 0, {
+  deliveriesShipday: z.coerce.number().min(0, "O número de entregas não pode ser negativo.").default(0),
+}).refine(data => data.deliveriesUber > 0 || data.deliveriesWedely > 0 || data.deliveriesSushishop > 0 || data.deliveriesShipday > 0, {
   message: "Deve registar pelo menos uma entrega.",
   path: ["deliveriesUber"],
 });
@@ -144,6 +145,7 @@ export default function TeamDetailsPage() {
       deliveriesUber: 0,
       deliveriesWedely: 0,
       deliveriesSushishop: 0,
+      deliveriesShipday: 0,
     },
   });
 
@@ -305,6 +307,7 @@ export default function TeamDetailsPage() {
         deliveriesUber: 0,
         deliveriesWedely: 0,
         deliveriesSushishop: 0,
+        deliveriesShipday: 0,
     });
     setIsDeliveriesDialogOpen(true);
   };
@@ -355,13 +358,14 @@ export default function TeamDetailsPage() {
     const driverToUpdate = await getDriver(selectedDriverForDeliveries.id);
     if (!driverToUpdate) return;
 
-    const totalDeliveriesToday = data.deliveriesUber + data.deliveriesWedely + data.deliveriesSushishop;
+    const totalDeliveriesToday = data.deliveriesUber + data.deliveriesWedely + data.deliveriesSushishop + data.deliveriesShipday;
 
     const newDelivery: DailyDelivery = {
       date: format(data.date, 'yyyy-MM-dd'),
       deliveriesUber: data.deliveriesUber,
       deliveriesWedely: data.deliveriesWedely,
       deliveriesSushishop: data.deliveriesSushishop,
+      deliveriesShipday: data.deliveriesShipday,
     };
 
     const existingDeliveryIndex = driverToUpdate.dailyDeliveries.findIndex(d => d.date === newDelivery.date);
@@ -383,7 +387,7 @@ export default function TeamDetailsPage() {
         date: new Date().toISOString(),
     });
 
-    const totalDeliveries = updatedDeliveries.reduce((sum, d) => sum + (d.deliveriesUber || 0) + (d.deliveriesWedely || 0) + (d.deliveriesSushishop || 0), 0);
+    const totalDeliveries = updatedDeliveries.reduce((sum, d) => sum + (d.deliveriesUber || 0) + (d.deliveriesWedely || 0) + (d.deliveriesSushishop || 0) + (d.deliveriesShipday || 0), 0);
     const newAchievementIds = [...driverToUpdate.achievementIds];
     
     if (totalDeliveries >= 150 && !driverToUpdate.achievementIds.includes('delivery-150')) {
@@ -429,6 +433,7 @@ export default function TeamDetailsPage() {
         deliveriesUber: 0,
         deliveriesWedely: 0,
         deliveriesSushishop: 0,
+        deliveriesShipday: 0,
     });
     fetchData();
     // Re-fetch driver for the dialog to show updated deliveries
@@ -726,7 +731,7 @@ export default function TeamDetailsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog modal={false} open={isDeliveriesDialogOpen} onOpenChange={(isOpen) => {
+      <Dialog open={isDeliveriesDialogOpen} onOpenChange={(isOpen) => {
         setIsDeliveriesDialogOpen(isOpen);
         if (!isOpen) {
           setSelectedDriverForDeliveries(null);
@@ -752,7 +757,7 @@ export default function TeamDetailsPage() {
                       render={({ field }) => (
                         <FormItem className="flex flex-col flex-grow">
                           <FormLabel>Data</FormLabel>
-                          <Popover>
+                          <Popover modal={false}>
                             <PopoverTrigger asChild>
                               <FormControl>
                                 <Button
@@ -775,7 +780,10 @@ export default function TeamDetailsPage() {
                               <Calendar
                                 mode="single"
                                 selected={field.value}
-                                onSelect={field.onChange}
+                                onSelect={(date) => {
+                                    field.onChange(date);
+                                    deliveryForm.clearErrors("date");
+                                }}
                                 disabled={(date) =>
                                   date > new Date() || date < new Date("2000-01-01") || (selectedDriverForDeliveries?.dailyDeliveries.some(d => d.date === format(date, 'yyyy-MM-dd')) ?? false)
                                 }
@@ -787,7 +795,7 @@ export default function TeamDetailsPage() {
                         </FormItem>
                       )}
                     />
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField
                             control={deliveryForm.control}
                             name="deliveriesUber"
@@ -827,6 +835,19 @@ export default function TeamDetailsPage() {
                                 </FormItem>
                             )}
                         />
+                        <FormField
+                            control={deliveryForm.control}
+                            name="deliveriesShipday"
+                            render={({ field }) => (
+                                <FormItem className="w-full">
+                                <FormLabel>Entregas Shipday</FormLabel>
+                                <FormControl>
+                                    <Input type="number" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                     </div>
                     <Button type="submit" className="w-full sm:w-auto">Adicionar</Button>
                   </form>
@@ -846,19 +867,21 @@ export default function TeamDetailsPage() {
                                     <TableHead className="text-center">Uber</TableHead>
                                     <TableHead className="text-center">Wedely</TableHead>
                                     <TableHead className="text-center">Sushishop</TableHead>
+                                    <TableHead className="text-center">Shipday</TableHead>
                                     <TableHead className="text-center">Total</TableHead>
                                     <TableHead className="text-right">Ação</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {selectedDriverForDeliveries.dailyDeliveries.map(delivery => {
-                                    const total = (delivery.deliveriesUber || 0) + (delivery.deliveriesWedely || 0) + (delivery.deliveriesSushishop || 0);
+                                    const total = (delivery.deliveriesUber || 0) + (delivery.deliveriesWedely || 0) + (delivery.deliveriesSushishop || 0) + (delivery.deliveriesShipday || 0);
                                     return (
                                         <TableRow key={delivery.date}>
                                             <TableCell>{format(new Date(delivery.date), "dd/MM/yyyy")}</TableCell>
                                             <TableCell className="text-center">{delivery.deliveriesUber || 0}</TableCell>
                                             <TableCell className="text-center">{delivery.deliveriesWedely || 0}</TableCell>
                                             <TableCell className="text-center">{delivery.deliveriesSushishop || 0}</TableCell>
+                                            <TableCell className="text-center">{delivery.deliveriesShipday || 0}</TableCell>
                                             <TableCell className="text-center font-bold">{total}</TableCell>
                                             <TableCell className="text-right">
                                                 <Button variant="ghost" size="icon" onClick={() => handleRemoveDelivery(delivery.date)}>

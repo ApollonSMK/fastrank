@@ -100,7 +100,7 @@ export default function CompetitionLeaderboardPage() {
                             const deliveryDate = startOfDay(parseISO(d.date));
                             return isWithinInterval(deliveryDate, competitionInterval);
                         })
-                        .reduce((sum, delivery) => sum + (delivery.deliveriesUber || 0) + (delivery.deliveriesWedely || 0) + (delivery.deliveriesSushishop || 0), 0);
+                        .reduce((sum, delivery) => sum + (delivery.deliveriesUber || 0) + (delivery.deliveriesWedely || 0) + (delivery.deliveriesSushishop || 0) + (delivery.deliveriesShipday || 0), 0);
                     break;
                 case 'safety':
                     score = driver.safetyScore;

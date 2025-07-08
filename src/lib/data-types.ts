@@ -4,6 +4,7 @@ export type DailyDelivery = {
   deliveriesUber: number;
   deliveriesWedely: number;
   deliveriesSushishop: number;
+  deliveriesShipday: number;
 };
 
 export type Achievement = {
@@ -72,6 +73,7 @@ export type Driver = {
   licensePlateHistory: VehicleHistoryEntry[];
   substituteVehicle?: SubstituteVehicle | null;
   lastDailyRewardClaimed?: string;
+  fcmToken?: string;
 };
 
 export type Team = {

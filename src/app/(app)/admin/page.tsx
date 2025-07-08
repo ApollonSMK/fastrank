@@ -155,7 +155,7 @@ const StatisticsManagement = () => {
     const freeVehicles = driversData.filter(d => d.name === '[VEÍCULO LIVRE]');
     
     const totalDeliveries = activeDrivers.reduce((sum, driver) => {
-        return sum + driver.dailyDeliveries.reduce((deliverySum, day) => deliverySum + (day.deliveriesUber || 0) + (day.deliveriesWedely || 0) + (day.deliveriesSushishop || 0), 0);
+        return sum + driver.dailyDeliveries.reduce((deliverySum, day) => deliverySum + (day.deliveriesUber || 0) + (day.deliveriesWedely || 0) + (day.deliveriesSushishop || 0) + (day.deliveriesShipday || 0), 0);
     }, 0);
 
     setStats({
@@ -170,7 +170,7 @@ const StatisticsManagement = () => {
     activeDrivers.forEach(driver => {
         if (driver.teamId && teamsMap.has(driver.teamId)) {
             const teamData = teamsMap.get(driver.teamId)!;
-            teamData.total += driver.dailyDeliveries.reduce((sum, day) => sum + (day.deliveriesUber || 0) + (day.deliveriesWedely || 0) + (day.deliveriesSushishop || 0), 0);
+            teamData.total += driver.dailyDeliveries.reduce((sum, day) => sum + (day.deliveriesUber || 0) + (day.deliveriesWedely || 0) + (day.deliveriesSushishop || 0) + (day.deliveriesShipday || 0), 0);
             teamsMap.set(driver.teamId, teamData);
         }
     });

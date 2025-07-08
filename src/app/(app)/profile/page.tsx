@@ -141,7 +141,7 @@ export default function ProfilePage() {
   }
 
   const { name, rank, trips, safetyScore, efficiency, dailyDeliveries, achievementIds, points, moneyBalance, lastDailyRewardClaimed } = driver;
-  const totalDeliveries = dailyDeliveries.reduce((sum, day) => sum + (day.deliveriesUber || 0) + (day.deliveriesWedely || 0) + (day.deliveriesSushishop || 0), 0);
+  const totalDeliveries = dailyDeliveries.reduce((sum, day) => sum + (day.deliveriesUber || 0) + (day.deliveriesWedely || 0) + (day.deliveriesSushishop || 0) + (day.deliveriesShipday || 0), 0);
 
   const stats = [
     { label: "Total de Entregas", value: totalDeliveries.toLocaleString(), icon: TrendingUp },
@@ -160,7 +160,7 @@ export default function ProfilePage() {
     })
     .map(d => ({
       date: d.dateObj.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' }),
-      deliveries: (d.deliveriesUber || 0) + (d.deliveriesWedely || 0) + (d.deliveriesSushishop || 0),
+      deliveries: (d.deliveriesUber || 0) + (d.deliveriesWedely || 0) + (d.deliveriesSushishop || 0) + (d.deliveriesShipday || 0),
     }));
   
   const today = new Date().toISOString().split('T')[0];
