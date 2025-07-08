@@ -2,73 +2,55 @@
 "use client";
 
 import { useEffect } from 'react';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
-import { auth, app } from '@/lib/firebase';
-import { getLoggedInDriver, updateDriver } from '@/lib/data-service';
-import { useToast } from '@/hooks/use-toast';
+import OneSignal from 'react-onesignal';
+import { auth } from '@/lib/firebase';
+import { getLoggedInDriver } from '@/lib/data-service';
 
 export default function PushNotificationManager() {
-  const { toast } = useToast();
 
   useEffect(() => {
-    const setupMessaging = async () => {
-      if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
-        return;
-      }
-
-      // Wait for the user to be logged in
-      if (!auth.currentUser) return;
-      
-      const messaging = getMessaging(app);
-
-      // 1. Request Permission
-      try {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          console.log('Notification permission granted.');
-
-          // 2. Get Token - IMPORTANT: You need to generate this key in your Firebase project settings
-          // Go to Project Settings > Cloud Messaging > Web configuration > Generate key pair
-          const vapidKey = "BDPgM4_O-81R9qgN_qU4jB-JjZ9J8Zz6Y8wX2Zz6X8wX2Zz6X8wX2Zz6X8wX2Zz6X8wX2Zz6X8wX2Zz6";
-          
-          const currentToken = await getToken(messaging, { vapidKey });
-          
-          if (currentToken) {
-            console.log('FCM Token:', currentToken);
-            // 3. Save Token to Firestore
-            const driver = await getLoggedInDriver();
-            if (driver && driver.fcmToken !== currentToken) {
-              await updateDriver(driver.id, { fcmToken: currentToken });
-              console.log('FCM token saved to Firestore.');
-            }
-          } else {
-            console.log('No registration token available. Request permission to generate one.');
-          }
-        } else {
-          console.log('Unable to get permission to notify.');
+    const runOneSignal = async () => {
+        // Wait for the user to be logged in
+        if (!auth.currentUser) return;
+        
+        // The OneSignal App ID should be stored in an environment variable
+        const ONE_SIGNAL_APP_ID = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
+        
+        if (!ONE_SIGNAL_APP_ID) {
+            console.error("OneSignal App ID is not configured. Please set NEXT_PUBLIC_ONESIGNAL_APP_ID in your .env file.");
+            return;
         }
-      } catch (err) {
-        console.error('An error occurred while retrieving token. ', err);
-      }
 
-      // 4. Handle Foreground Messages
-      onMessage(messaging, (payload) => {
-        console.log('Message received. ', payload);
-        toast({
-          title: payload.notification?.title,
-          description: payload.notification?.body,
-        });
-      });
+        try {
+            await OneSignal.init({ appId: ONE_SIGNAL_APP_ID, allowLocalhostAsSecureOrigin: true });
+            
+            // Set the external user ID to link this device with the driver in Firestore
+            const driver = await getLoggedInDriver();
+            if (driver && driver.id) {
+                OneSignal.login(driver.id);
+                console.log(`OneSignal user logged in with external ID: ${driver.id}`);
+            }
+        } catch (error) {
+            console.error("Error initializing OneSignal:", error);
+        }
     };
-
+    
+    // Run OneSignal setup once the user is authenticated
     const unsubscribe = auth.onAuthStateChanged(user => {
         if (user) {
-            setupMessaging();
+            runOneSignal();
+        } else {
+            // If user logs out, logout from OneSignal too
+            if (OneSignal.User.isLoggedIn()) {
+                OneSignal.logout();
+                console.log("OneSignal user logged out.");
+            }
         }
     });
 
     return () => unsubscribe();
-  }, [toast]);
 
-  return null;
+  }, []);
+
+  return null; // This component does not render anything
 }

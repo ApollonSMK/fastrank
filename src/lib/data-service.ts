@@ -369,10 +369,8 @@ export type SendNotificationPayload = {
 };
 
 export async function sendNotification(payload: SendNotificationPayload) {
-  // This is a placeholder for sending a real push notification via FCM.
-  // In a real application, this would trigger a Firebase Function.
-  // The function would look up the target drivers' FCM tokens and send the push notification.
-  // For now, we will just add the notification to the driver's in-app notification list.
+  // This function now only handles IN-APP notifications.
+  // The actual PUSH notification is sent via a separate mechanism (e.g., OneSignal dashboard or a backend function).
 
   const { targetType, targetId, title, description, link } = payload;
 
