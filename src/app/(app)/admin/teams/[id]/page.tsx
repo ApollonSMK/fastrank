@@ -71,7 +71,8 @@ const deliveryFormSchema = z.object({
   date: z.date({ required_error: "A data é obrigatória." }),
   deliveriesUber: z.coerce.number().min(0, "O número de entregas não pode ser negativo.").default(0),
   deliveriesWedely: z.coerce.number().min(0, "O número de entregas não pode ser negativo.").default(0),
-}).refine(data => data.deliveriesUber > 0 || data.deliveriesWedely > 0, {
+  deliveriesSushishop: z.coerce.number().min(0, "O número de entregas não pode ser negativo.").default(0),
+}).refine(data => data.deliveriesUber > 0 || data.deliveriesWedely > 0 || data.deliveriesSushishop > 0, {
   message: "Deve registar pelo menos uma entrega.",
   path: ["deliveriesUber"],
 });
@@ -142,6 +143,7 @@ export default function TeamDetailsPage() {
       date: new Date(),
       deliveriesUber: 0,
       deliveriesWedely: 0,
+      deliveriesSushishop: 0,
     },
   });
 
@@ -302,6 +304,7 @@ export default function TeamDetailsPage() {
         date: new Date(),
         deliveriesUber: 0,
         deliveriesWedely: 0,
+        deliveriesSushishop: 0,
     });
     setIsDeliveriesDialogOpen(true);
   };
@@ -352,12 +355,13 @@ export default function TeamDetailsPage() {
     const driverToUpdate = await getDriver(selectedDriverForDeliveries.id);
     if (!driverToUpdate) return;
 
-    const totalDeliveriesToday = data.deliveriesUber + data.deliveriesWedely;
+    const totalDeliveriesToday = data.deliveriesUber + data.deliveriesWedely + data.deliveriesSushishop;
 
     const newDelivery: DailyDelivery = {
       date: format(data.date, 'yyyy-MM-dd'),
       deliveriesUber: data.deliveriesUber,
       deliveriesWedely: data.deliveriesWedely,
+      deliveriesSushishop: data.deliveriesSushishop,
     };
 
     const existingDeliveryIndex = driverToUpdate.dailyDeliveries.findIndex(d => d.date === newDelivery.date);
@@ -379,7 +383,7 @@ export default function TeamDetailsPage() {
         date: new Date().toISOString(),
     });
 
-    const totalDeliveries = updatedDeliveries.reduce((sum, d) => sum + (d.deliveriesUber || 0) + (d.deliveriesWedely || 0), 0);
+    const totalDeliveries = updatedDeliveries.reduce((sum, d) => sum + (d.deliveriesUber || 0) + (d.deliveriesWedely || 0) + (d.deliveriesSushishop || 0), 0);
     const newAchievementIds = [...driverToUpdate.achievementIds];
     
     if (totalDeliveries >= 150 && !driverToUpdate.achievementIds.includes('delivery-150')) {
@@ -424,6 +428,7 @@ export default function TeamDetailsPage() {
         date: new Date(),
         deliveriesUber: 0,
         deliveriesWedely: 0,
+        deliveriesSushishop: 0,
     });
     fetchData();
     // Re-fetch driver for the dialog to show updated deliveries
@@ -728,7 +733,7 @@ export default function TeamDetailsPage() {
           deliveryForm.reset();
         }
       }}>
-        <DialogContent className="w-[95vw] sm:max-w-xl">
+        <DialogContent className="w-[95vw] sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Gerir Entregas de {selectedDriverForDeliveries?.name}</DialogTitle>
             <DialogDescription>Adicione ou remova registos de entregas diárias.</DialogDescription>
@@ -782,13 +787,13 @@ export default function TeamDetailsPage() {
                         </FormItem>
                       )}
                     />
-                    <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <FormField
                             control={deliveryForm.control}
                             name="deliveriesUber"
                             render={({ field }) => (
                                 <FormItem className="w-full">
-                                <FormLabel>Nº de Entregas Uber</FormLabel>
+                                <FormLabel>Entregas Uber</FormLabel>
                                 <FormControl>
                                     <Input type="number" {...field} />
                                 </FormControl>
@@ -801,7 +806,20 @@ export default function TeamDetailsPage() {
                             name="deliveriesWedely"
                             render={({ field }) => (
                                 <FormItem className="w-full">
-                                <FormLabel>Nº de Entregas Wedely</FormLabel>
+                                <FormLabel>Entregas Wedely</FormLabel>
+                                <FormControl>
+                                    <Input type="number" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={deliveryForm.control}
+                            name="deliveriesSushishop"
+                            render={({ field }) => (
+                                <FormItem className="w-full">
+                                <FormLabel>Entregas Sushishop</FormLabel>
                                 <FormControl>
                                     <Input type="number" {...field} />
                                 </FormControl>
@@ -827,18 +845,20 @@ export default function TeamDetailsPage() {
                                     <TableHead>Data</TableHead>
                                     <TableHead className="text-center">Uber</TableHead>
                                     <TableHead className="text-center">Wedely</TableHead>
+                                    <TableHead className="text-center">Sushishop</TableHead>
                                     <TableHead className="text-center">Total</TableHead>
                                     <TableHead className="text-right">Ação</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {selectedDriverForDeliveries.dailyDeliveries.map(delivery => {
-                                    const total = (delivery.deliveriesUber || 0) + (delivery.deliveriesWedely || 0);
+                                    const total = (delivery.deliveriesUber || 0) + (delivery.deliveriesWedely || 0) + (delivery.deliveriesSushishop || 0);
                                     return (
                                         <TableRow key={delivery.date}>
                                             <TableCell>{format(new Date(delivery.date), "dd/MM/yyyy")}</TableCell>
                                             <TableCell className="text-center">{delivery.deliveriesUber || 0}</TableCell>
                                             <TableCell className="text-center">{delivery.deliveriesWedely || 0}</TableCell>
+                                            <TableCell className="text-center">{delivery.deliveriesSushishop || 0}</TableCell>
                                             <TableCell className="text-center font-bold">{total}</TableCell>
                                             <TableCell className="text-right">
                                                 <Button variant="ghost" size="icon" onClick={() => handleRemoveDelivery(delivery.date)}>

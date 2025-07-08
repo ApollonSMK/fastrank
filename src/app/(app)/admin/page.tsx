@@ -138,7 +138,7 @@ const StatisticsManagement = () => {
     const freeVehicles = driversData.filter(d => d.name === '[VEÍCULO LIVRE]');
     
     const totalDeliveries = activeDrivers.reduce((sum, driver) => {
-        return sum + driver.dailyDeliveries.reduce((deliverySum, day) => deliverySum + (day.deliveriesUber || 0) + (day.deliveriesWedely || 0), 0);
+        return sum + driver.dailyDeliveries.reduce((deliverySum, day) => deliverySum + (day.deliveriesUber || 0) + (day.deliveriesWedely || 0) + (day.deliveriesSushishop || 0), 0);
     }, 0);
 
     setStats({
@@ -153,7 +153,7 @@ const StatisticsManagement = () => {
     activeDrivers.forEach(driver => {
         if (driver.teamId && teamsMap.has(driver.teamId)) {
             const teamData = teamsMap.get(driver.teamId)!;
-            teamData.total += driver.dailyDeliveries.reduce((sum, day) => sum + (day.deliveriesUber || 0) + (day.deliveriesWedely || 0), 0);
+            teamData.total += driver.dailyDeliveries.reduce((sum, day) => sum + (day.deliveriesUber || 0) + (day.deliveriesWedely || 0) + (day.deliveriesSushishop || 0), 0);
             teamsMap.set(driver.teamId, teamData);
         }
     });
@@ -279,7 +279,7 @@ const DriversManagement = () => {
             getAllDrivers(),
             getAllTeams(),
         ]);
-        const activeDrivers = driversData.filter(d => d.name !== '[VEÍCULO LIVRE]' && d.email !== 'info@fastrack.lu');
+        const activeDrivers = driversData.filter(d => d.name !== '[VEÍCulo LIVRE]' && d.email !== 'info@fastrack.lu');
         const freeVehiclesData = driversData.filter(d => d.name === '[VEÍCULO LIVRE]');
 
         setDrivers(activeDrivers.sort((a,b) => a.name.localeCompare(b.name)));
@@ -1890,5 +1890,3 @@ export default function AdminPage() {
     
 
     
-
-
