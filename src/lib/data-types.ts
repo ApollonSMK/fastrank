@@ -96,6 +96,7 @@ export type Competition = {
   rewardType: 'points' | 'money';
   rewardAmount: number;
   enrollmentCost: number;
+  isPaidOut?: boolean;
 };
 
 export type FleetChangeLog = {

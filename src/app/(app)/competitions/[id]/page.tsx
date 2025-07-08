@@ -3,7 +3,7 @@
 
 import { useMemo, useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getCompetition, getAllDrivers, getAllTeams } from '@/lib/data-service';
+import { getCompetition, getAllDrivers, getAllTeams, getLoggedInDriver, updateCompetition, updateDriver } from '@/lib/data-service';
 import { Competition, Driver, Team } from '@/lib/data-types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ArrowLeft, Trophy, Award, Medal, ShieldCheck, Fuel, TrendingUp, Gift } from 'lucide-react';
 import { isWithinInterval, parseISO, startOfDay } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from "@/hooks/use-toast";
 
 const metricInfo = {
   deliveries: { label: "Total de Entregas", icon: TrendingUp },
@@ -52,18 +53,25 @@ export default function CompetitionLeaderboardPage() {
     const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [isPayingOut, setIsPayingOut] = useState(false);
+    const { toast } = useToast();
 
     const fetchData = useCallback(async () => {
         if (!competitionId) return;
         setIsLoading(true);
-        const [compData, driversData, teamsData] = await Promise.all([
+        const [compData, driversData, teamsData, loggedInDriver] = await Promise.all([
             getCompetition(competitionId),
             getAllDrivers(),
-            getAllTeams()
+            getAllTeams(),
+            getLoggedInDriver()
         ]);
         setCompetition(compData);
-        setAllDrivers(driversData.filter(d => d.email !== 'admin@fastrack.lu'));
+        setAllDrivers(driversData.filter(d => d.email !== 'info@fastrack.lu'));
         setTeams(teamsData);
+        if (loggedInDriver && loggedInDriver.email === 'info@fastrack.lu') {
+            setIsAdmin(true);
+        }
         setIsLoading(false);
     }, [competitionId]);
 
@@ -92,7 +100,7 @@ export default function CompetitionLeaderboardPage() {
                             const deliveryDate = startOfDay(parseISO(d.date));
                             return isWithinInterval(deliveryDate, competitionInterval);
                         })
-                        .reduce((sum, delivery) => sum + delivery.deliveries, 0);
+                        .reduce((sum, delivery) => sum + (delivery.deliveriesUber || 0) + (delivery.deliveriesWedely || 0), 0);
                     break;
                 case 'safety':
                     score = driver.safetyScore;
@@ -107,6 +115,62 @@ export default function CompetitionLeaderboardPage() {
         return driversWithScores.sort((a, b) => b.score - a.score);
 
     }, [competition, allDrivers]);
+    
+    const handlePayout = async () => {
+        if (!competition || !rankedDrivers.length || !isAdmin || competition.isPaidOut) {
+            return;
+        }
+        const winner = rankedDrivers[0];
+        if (!winner) {
+            toast({
+                variant: "destructive",
+                title: "Sem Vencedor",
+                description: "Não há um vencedor claro para distribuir o prémio.",
+            });
+            return;
+        }
+
+        setIsPayingOut(true);
+        try {
+            const winnerUpdate: Partial<Driver> = {
+                notifications: [
+                    ...(winner.notifications || []),
+                    {
+                        id: Date.now(),
+                        title: `Prémio Recebido!`,
+                        description: `Ganhou a competição "${competition.name}" e recebeu ${competition.rewardAmount} ${competition.rewardType === 'points' ? 'pontos' : '€'}. Parabéns!`,
+                        read: false,
+                        date: new Date().toISOString(),
+                        link: `/competitions/${competition.id}`
+                    }
+                ]
+            };
+
+            if (competition.rewardType === 'points') {
+                winnerUpdate.points = (winner.points || 0) + competition.rewardAmount;
+            } else {
+                winnerUpdate.moneyBalance = (winner.moneyBalance || 0) + competition.rewardAmount;
+            }
+
+            await updateDriver(winner.id, winnerUpdate);
+            await updateCompetition(competition.id, { isPaidOut: true });
+
+            toast({
+                title: "Prémio distribuído!",
+                description: `${winner.name} recebeu o prémio da competição.`,
+            });
+            fetchData();
+        } catch (error) {
+            console.error("Error paying out prize:", error);
+            toast({
+                variant: "destructive",
+                title: "Erro",
+                description: "Não foi possível distribuir o prémio.",
+            });
+        } finally {
+            setIsPayingOut(false);
+        }
+    };
     
     if (isLoading) {
         return (
@@ -189,7 +253,7 @@ export default function CompetitionLeaderboardPage() {
                                     </div>
                                     <div className="text-right">
                                          <p className="text-lg font-bold text-primary">{driver.score.toLocaleString()}</p>
-                                         <p className="text-xs text-muted-foreground">{competition.metric === 'safety' || competition.metric === 'efficiency' ? '%' : 'Entregas'}</p>
+                                         <p className="text-xs text-muted-foreground">{competition.metric === 'deliveries' ? 'Entregas' : '%'}</p>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -203,6 +267,27 @@ export default function CompetitionLeaderboardPage() {
                     </Card>
                  )}
             </div>
+            
+            {isAdmin && new Date() > new Date(competition.endDate) && (
+                <Card className="mt-6 border-amber-500/50">
+                    <CardHeader>
+                        <CardTitle>Ações de Administrador</CardTitle>
+                        <CardDescription>Gerir o estado final desta competição.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {competition.isPaidOut ? (
+                            <p className="text-muted-foreground">O prémio para esta competição já foi distribuído.</p>
+                        ) : (
+                            <div className="space-y-2">
+                                <p>A competição terminou. Clique abaixo para distribuir o prémio ao vencedor.</p>
+                                <Button onClick={handlePayout} disabled={isPayingOut || rankedDrivers.length === 0}>
+                                    {isPayingOut ? 'A distribuir...' : `Distribuir Prémio para ${rankedDrivers[0]?.name || 'Vencedor'}`}
+                                </Button>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 }

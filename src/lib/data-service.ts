@@ -234,6 +234,10 @@ export async function addCompetition(compData: Omit<Competition, 'id'>) {
     return await addDoc(collection(db, 'competitions'), dataWithTimestamps);
 }
 
+export async function updateCompetition(id: string, data: Partial<Competition>) {
+    await updateDoc(doc(db, 'competitions', id), data);
+}
+
 export async function deleteCompetition(id: string) {
     await deleteDoc(doc(db, 'competitions', id));
 }
