@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { DateRange } from "react-day-picker";
-import { addDays, format, isWithinInterval, startOfDay } from "date-fns";
+import { addDays, format, isWithinInterval, startOfDay, parseISO } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
@@ -141,7 +141,7 @@ export default function ProfilePage() {
   }
 
   const { name, rank, trips, safetyScore, efficiency, dailyDeliveries, achievementIds, points, moneyBalance, lastDailyRewardClaimed } = driver;
-  const totalDeliveries = dailyDeliveries.reduce((sum, day) => sum + day.deliveries, 0);
+  const totalDeliveries = dailyDeliveries.reduce((sum, day) => sum + (day.deliveriesUber || 0) + (day.deliveriesWedely || 0), 0);
 
   const stats = [
     { label: "Total de Entregas", value: totalDeliveries.toLocaleString(), icon: TrendingUp },
@@ -151,7 +151,7 @@ export default function ProfilePage() {
   ];
 
   const chartData = dailyDeliveries
-    .map(d => ({ ...d, dateObj: new Date(d.date) }))
+    .map(d => ({ ...d, dateObj: parseISO(d.date) }))
     .filter(d => {
         if (!date?.from) return true;
         const from = date.from;
@@ -160,7 +160,7 @@ export default function ProfilePage() {
     })
     .map(d => ({
       date: d.dateObj.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' }),
-      deliveries: d.deliveries,
+      deliveries: (d.deliveriesUber || 0) + (d.deliveriesWedely || 0),
     }));
   
   const today = new Date().toISOString().split('T')[0];

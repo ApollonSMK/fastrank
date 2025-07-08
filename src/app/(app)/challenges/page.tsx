@@ -66,7 +66,7 @@ const resolveCompletedChallenges = async (currentChallenges: Challenge[], allDri
                 case 'deliveries':
                     return driver.dailyDeliveries
                         .filter(d => isWithinInterval(parseISO(d.date), challengeInterval))
-                        .reduce((sum, delivery) => sum + delivery.deliveries, 0);
+                        .reduce((sum, delivery) => sum + (delivery.deliveriesUber || 0) + (delivery.deliveriesWedely || 0), 0);
                 case 'safety': return driver.safetyScore;
                 case 'efficiency': return driver.efficiency;
                 default: return 0;
