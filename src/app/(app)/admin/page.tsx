@@ -138,7 +138,7 @@ const StatisticsManagement = () => {
     const freeVehicles = driversData.filter(d => d.name === '[VEÍCULO LIVRE]');
     
     const totalDeliveries = activeDrivers.reduce((sum, driver) => {
-        return sum + driver.dailyDeliveries.reduce((deliverySum, day) => deliverySum + day.deliveries, 0);
+        return sum + driver.dailyDeliveries.reduce((deliverySum, day) => deliverySum + (day.deliveriesUber || 0) + (day.deliveriesWedely || 0), 0);
     }, 0);
 
     setStats({
@@ -153,7 +153,7 @@ const StatisticsManagement = () => {
     activeDrivers.forEach(driver => {
         if (driver.teamId && teamsMap.has(driver.teamId)) {
             const teamData = teamsMap.get(driver.teamId)!;
-            teamData.total += driver.dailyDeliveries.reduce((sum, day) => sum + day.deliveries, 0);
+            teamData.total += driver.dailyDeliveries.reduce((sum, day) => sum + (day.deliveriesUber || 0) + (day.deliveriesWedely || 0), 0);
             teamsMap.set(driver.teamId, teamData);
         }
     });
@@ -1625,7 +1625,7 @@ const CompetitionsManagement = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-headline text-xl font-bold">Gestão de Competições</h3>
-        <Dialog open={isAddCompetitionDialogOpen} onOpenChange={setIsAddCompetitionDialogOpen}>
+        <Dialog modal={false} open={isAddCompetitionDialogOpen} onOpenChange={setIsAddCompetitionDialogOpen}>
             <DialogTrigger asChild>
                 <Button>
                     <PlusCircle className="mr-2 h-4 w-4" />
@@ -1890,4 +1890,5 @@ export default function AdminPage() {
     
 
     
+
 

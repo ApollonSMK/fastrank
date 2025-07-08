@@ -139,6 +139,7 @@ export default function TeamDetailsPage() {
   const deliveryForm = useForm<DeliveryFormValues>({
     resolver: zodResolver(deliveryFormSchema),
     defaultValues: {
+      date: new Date(),
       deliveriesUber: 0,
       deliveriesWedely: 0,
     },
@@ -297,7 +298,11 @@ export default function TeamDetailsPage() {
 
   const openDeliveriesDialog = (driver: Driver) => {
     setSelectedDriverForDeliveries(driver);
-    deliveryForm.reset();
+    deliveryForm.reset({
+        date: new Date(),
+        deliveriesUber: 0,
+        deliveriesWedely: 0,
+    });
     setIsDeliveriesDialogOpen(true);
   };
   
@@ -415,7 +420,11 @@ export default function TeamDetailsPage() {
     
     await updateDriver(driverToUpdate.id, updates);
     
-    deliveryForm.reset();
+    deliveryForm.reset({
+        date: new Date(),
+        deliveriesUber: 0,
+        deliveriesWedely: 0,
+    });
     fetchData();
     // Re-fetch driver for the dialog to show updated deliveries
     const updatedDriver = await getDriver(selectedDriverForDeliveries.id);
@@ -712,7 +721,7 @@ export default function TeamDetailsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDeliveriesDialogOpen} onOpenChange={(isOpen) => {
+      <Dialog modal={false} open={isDeliveriesDialogOpen} onOpenChange={(isOpen) => {
         setIsDeliveriesDialogOpen(isOpen);
         if (!isOpen) {
           setSelectedDriverForDeliveries(null);

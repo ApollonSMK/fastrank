@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, Dialog
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { DateRange } from "react-day-picker";
-import { addDays, format, isWithinInterval, startOfDay } from "date-fns";
+import { addDays, format, isWithinInterval, startOfDay, parseISO } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
@@ -81,7 +81,7 @@ const DriverProfileContent = ({ driver, rank }: { driver: Driver, rank: number }
     if (!date?.from) return [];
     
     return dailyDeliveries
-      .map(d => ({ ...d, dateObj: new Date(d.date) }))
+      .map(d => ({ ...d, dateObj: parseISO(d.date) }))
       .filter(d => {
           const from = date.from!;
           const to = date.to ?? from;
@@ -295,7 +295,7 @@ export default function DashboardPage() {
           if (!date?.from) {
             return true;
           }
-          const deliveryDate = new Date(delivery.date);
+          const deliveryDate = parseISO(delivery.date);
           
           const interval = {
             start: startOfDay(date.from),
@@ -320,6 +320,7 @@ export default function DashboardPage() {
   const deliveryForm = useForm<DeliveryFormValues>({
     resolver: zodResolver(deliveryFormSchema),
     defaultValues: {
+      date: new Date(),
       deliveriesUber: 0,
       deliveriesWedely: 0,
     },
@@ -399,7 +400,11 @@ export default function DashboardPage() {
 
     await updateDriver(driverToUpdate.id, updates);
 
-    deliveryForm.reset();
+    deliveryForm.reset({
+        date: new Date(),
+        deliveriesUber: 0,
+        deliveriesWedely: 0,
+    });
     fetchData(); // Refresh data
 
     const updatedDriverForDialog = await getDriver(selectedDriverForDeliveries.id);
@@ -424,7 +429,11 @@ export default function DashboardPage() {
   const openDeliveriesDialog = (e: React.MouseEvent, driver: Driver) => {
     e.stopPropagation();
     setSelectedDriverForDeliveries(driver);
-    deliveryForm.reset();
+    deliveryForm.reset({
+        date: new Date(),
+        deliveriesUber: 0,
+        deliveriesWedely: 0,
+    });
     setIsDeliveriesDialogOpen(true);
   };
 
@@ -516,7 +525,7 @@ export default function DashboardPage() {
               
               const weeklyDeliveries = driver.dailyDeliveries
                 .filter(d => {
-                  const deliveryDate = new Date(d.date);
+                  const deliveryDate = parseISO(d.date);
                   return isWithinInterval(deliveryDate, { start: sevenDaysAgo, end: today });
                 })
                 .reduce((sum, d) => sum + (d.deliveriesUber || 0) + (d.deliveriesWedely || 0), 0);
@@ -570,7 +579,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <Dialog open={isDeliveriesDialogOpen} onOpenChange={(isOpen) => {
+      <Dialog modal={false} open={isDeliveriesDialogOpen} onOpenChange={(isOpen) => {
         setIsDeliveriesDialogOpen(isOpen);
         if (!isOpen) {
           setSelectedDriverForDeliveries(null);
@@ -685,7 +694,7 @@ export default function DashboardPage() {
                                     const total = (delivery.deliveriesUber || 0) + (delivery.deliveriesWedely || 0);
                                     return (
                                         <TableRow key={delivery.date}>
-                                            <TableCell>{format(new Date(delivery.date), "dd/MM/yyyy")}</TableCell>
+                                            <TableCell>{format(parseISO(delivery.date), "dd/MM/yyyy")}</TableCell>
                                             <TableCell className="text-center">{delivery.deliveriesUber || 0}</TableCell>
                                             <TableCell className="text-center">{delivery.deliveriesWedely || 0}</TableCell>
                                             <TableCell className="text-center font-bold">{total}</TableCell>
