@@ -2,7 +2,7 @@
 import { db, auth, authInitialized } from './firebase';
 import { collection, getDocs, doc, getDoc, setDoc, query, where, addDoc, updateDoc, deleteDoc, Timestamp, arrayUnion, orderBy, limit } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import type { Driver, Team, Competition, Challenge, RankHistory, VehicleHistoryEntry, FleetChangeLog } from './data-types';
+import type { Driver, Team, Competition, Challenge, RankHistory, VehicleHistoryEntry, FleetChangeLog, Notification } from './data-types';
 
 // Helper function to convert Firestore doc to a usable object with ID
 function docToObject<T>(doc: any): T {
@@ -357,6 +357,66 @@ export async function claimDailyReward(driverId: string): Promise<number> {
     });
     
     return newPoints;
+}
+
+// --- Notifications ---
+export type SendNotificationPayload = {
+  targetType: 'all' | 'team' | 'driver';
+  targetId?: string;
+  title: string;
+  description: string;
+  link?: string;
+};
+
+export async function sendNotification(payload: SendNotificationPayload) {
+  // This is a placeholder for sending a real push notification via FCM.
+  // In a real application, this would trigger a Firebase Function.
+  // The function would look up the target drivers' FCM tokens and send the push notification.
+  // For now, we will just add the notification to the driver's in-app notification list.
+
+  const { targetType, targetId, title, description, link } = payload;
+
+  let targetDrivers: Driver[] = [];
+
+  if (targetType === 'all') {
+    const allDrivers = await getAllDrivers();
+    targetDrivers = allDrivers.filter(d => d.name !== '[VEÍCULO LIVRE]' && d.email !== 'info@fastrack.lu');
+  } else if (targetType === 'team' && targetId) {
+    targetDrivers = await getDriversByTeam(targetId);
+  } else if (targetType === 'driver' && targetId) {
+    const driver = await getDriver(targetId);
+    if (driver) {
+      targetDrivers.push(driver);
+    }
+  }
+
+  if (targetDrivers.length === 0) {
+    throw new Error("Nenhum motorista encontrado para o alvo selecionado.");
+  }
+
+  const newNotification: Omit<Notification, 'id'> = {
+    title,
+    description,
+    read: false,
+    date: new Date().toISOString(),
+    link: link || undefined,
+  };
+
+  const updatePromises = targetDrivers.map(driver => {
+    const driverRef = doc(db, 'drivers', driver.id);
+    const currentNotifications = driver.notifications || [];
+    
+    const notificationsToUpdate = [
+        ...currentNotifications,
+        { ...newNotification, id: Date.now() + Math.random() }
+    ];
+    
+    return updateDoc(driverRef, {
+      notifications: notificationsToUpdate
+    });
+  });
+
+  await Promise.all(updatePromises);
 }
 
 

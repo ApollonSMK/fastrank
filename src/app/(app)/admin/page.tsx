@@ -21,8 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Team, Competition, Driver, FleetChangeLog, VehicleHistoryEntry } from "@/lib/data-types";
-import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition, getFleetChangeLog, updateDriver, getDriver, deleteDriver, addFreeVehicle, addFleetChangeLog, assignDriverToVehicle } from "@/lib/data-service";
-import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2, Trash2, Car, FileDown, Contact, History, Edit, Replace } from "lucide-react";
+import { getAllTeams, addTeam, getAllCompetitions, addCompetition, getAllDrivers, deleteCompetition, getFleetChangeLog, updateDriver, getDriver, deleteDriver, addFreeVehicle, addFleetChangeLog, assignDriverToVehicle, sendNotification } from "@/lib/data-service";
+import { PlusCircle, MoreVertical, Users, Swords, Calendar as CalendarIcon, BarChart2, Trash2, Car, FileDown, Contact, History, Edit, Replace, MessageSquare } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +62,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { useToast } from "@/hooks/use-toast";
 
 
 const teamFormSchema = z.object({
@@ -115,6 +116,22 @@ const editVehicleFormSchema = z.object({
     vehicleModel: z.string().min(2, { message: 'O modelo deve ter pelo menos 2 caracteres.' }),
 });
 type EditVehicleFormValues = z.infer<typeof editVehicleFormSchema>;
+
+const notificationFormSchema = z.object({
+  targetType: z.enum(['all', 'team', 'driver'], { required_error: "É obrigatório selecionar um público." }),
+  targetId: z.string().optional(),
+  title: z.string().min(3, "O título deve ter pelo menos 3 caracteres."),
+  message: z.string().min(10, "A mensagem deve ter pelo menos 10 caracteres."),
+}).refine(data => {
+    if (data.targetType === 'team' || data.targetType === 'driver') {
+        return !!data.targetId;
+    }
+    return true;
+}, {
+    message: "É obrigatório selecionar um alvo específico.",
+    path: ["targetId"],
+});
+type NotificationFormValues = z.infer<typeof notificationFormSchema>;
 
 
 const StatisticsManagement = () => {
@@ -1854,6 +1871,178 @@ const CompetitionsManagement = () => {
   );
 };
 
+const NotificationsManagement = () => {
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  const form = useForm<NotificationFormValues>({
+      resolver: zodResolver(notificationFormSchema),
+      defaultValues: {
+          targetType: 'all',
+          title: '',
+          message: '',
+      }
+  });
+
+  const targetType = form.watch('targetType');
+
+  useEffect(() => {
+      const fetchData = async () => {
+          setIsLoading(true);
+          const [teamsData, driversData] = await Promise.all([
+              getAllTeams(),
+              getAllDrivers(),
+          ]);
+          setTeams(teamsData);
+          setDrivers(driversData.filter(d => d.name !== '[VEÍCULO LIVRE]' && d.email !== 'info@fastrack.lu'));
+          setIsLoading(false);
+      }
+      fetchData();
+  }, []);
+  
+  const onSubmit: SubmitHandler<NotificationFormValues> = async (data) => {
+    try {
+        await sendNotification({
+            targetType: data.targetType,
+            targetId: data.targetId,
+            title: data.title,
+            description: data.message
+        });
+        toast({
+            title: "Notificação Enviada!",
+            description: "A notificação foi adicionada à lista de notificações dos motoristas.",
+        });
+        form.reset({
+            targetType: 'all',
+            targetId: '',
+            title: '',
+            message: '',
+        });
+    } catch (error: any) {
+        toast({
+            variant: "destructive",
+            title: "Erro ao Enviar",
+            description: error.message || "Não foi possível enviar a notificação.",
+        });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Enviar Notificação Push</CardTitle>
+        <CardDescription>Envie uma mensagem para os seus motoristas. A notificação aparecerá nos seus dispositivos e na lista de notificações da app.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                 <FormField
+                    control={form.control}
+                    name="targetType"
+                    render={({ field }) => (
+                        <FormItem className="space-y-3">
+                            <FormLabel>Público-Alvo</FormLabel>
+                            <FormControl>
+                                <RadioGroup
+                                    onValueChange={(value) => {
+                                        field.onChange(value);
+                                        form.setValue('targetId', ''); // Reset targetId when type changes
+                                    }}
+                                    defaultValue={field.value}
+                                    className="flex flex-col sm:flex-row gap-4"
+                                >
+                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl><RadioGroupItem value="all" /></FormControl>
+                                        <FormLabel className="font-normal">Todos os Motoristas</FormLabel>
+                                    </FormItem>
+                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl><RadioGroupItem value="team" /></FormControl>
+                                        <FormLabel className="font-normal">Uma Equipa</FormLabel>
+                                    </FormItem>
+                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl><RadioGroupItem value="driver" /></FormControl>
+                                        <FormLabel className="font-normal">Um Motorista</FormLabel>
+                                    </FormItem>
+                                </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                
+                {targetType === 'team' && (
+                     <FormField
+                        control={form.control}
+                        name="targetId"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Selecione a Equipa</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Escolha uma equipa..." /></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        {teams.map(team => <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
+                
+                {targetType === 'driver' && (
+                     <FormField
+                        control={form.control}
+                        name="targetId"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Selecione o Motorista</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Escolha um motorista..." /></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        {drivers.map(driver => <SelectItem key={driver.id} value={driver.id}>{driver.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
+
+                <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Título</FormLabel>
+                            <FormControl><Input placeholder="Título da sua notificação" {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <FormField
+                    control={form.control}
+                    name="message"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Mensagem</FormLabel>
+                            <FormControl><Textarea placeholder="Escreva a sua mensagem aqui..." {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <Button type="submit" disabled={form.formState.isSubmitting || isLoading}>
+                    {form.formState.isSubmitting ? 'A Enviar...' : 'Enviar Notificação'}
+                </Button>
+            </form>
+        </Form>
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function AdminPage() {
   return (
@@ -1866,6 +2055,7 @@ export default function AdminPage() {
                 <TabsTrigger value="teams"><Users className="mr-2 h-4 w-4" /> Equipas</TabsTrigger>
                 <TabsTrigger value="competitions"><Swords className="mr-2 h-4 w-4" /> Competições</TabsTrigger>
                 <TabsTrigger value="vehicles"><Car className="mr-2 h-4 w-4" /> Veículos</TabsTrigger>
+                <TabsTrigger value="notifications"><MessageSquare className="mr-2 h-4 w-4" /> Notificações</TabsTrigger>
             </TabsList>
             <TabsContent value="statistics">
                 <StatisticsManagement />
@@ -1882,11 +2072,10 @@ export default function AdminPage() {
             <TabsContent value="vehicles">
                 <VehiclesManagement />
             </TabsContent>
+             <TabsContent value="notifications">
+                <NotificationsManagement />
+            </TabsContent>
         </Tabs>
     </>
   );
 }
-
-    
-
-    
