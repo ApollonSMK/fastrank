@@ -72,6 +72,7 @@ export type Driver = {
   licensePlateHistory: VehicleHistoryEntry[];
   substituteVehicle?: SubstituteVehicle | null;
   lastDailyRewardClaimed?: string;
+  fcmToken?: string | null;
 };
 
 export type Team = {

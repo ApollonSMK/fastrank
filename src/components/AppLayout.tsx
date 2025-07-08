@@ -7,6 +7,7 @@ import { auth } from '@/lib/firebase';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import { Skeleton } from '@/components/ui/skeleton';
+import PushNotificationManager from './PushNotificationManager';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -50,6 +51,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen flex-col">
+      <PushNotificationManager />
       <Header />
       <main className="flex-1 overflow-y-auto bg-background pb-20 pt-4">
         <div className="container mx-auto max-w-3xl px-4">
