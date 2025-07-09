@@ -392,13 +392,16 @@ export async function sendNotification(payload: SendNotificationPayload) {
     throw new Error("Nenhum motorista encontrado para o alvo selecionado.");
   }
 
-  const newNotification: Omit<Notification, 'id'> = {
+  const newNotification: Omit<Notification, 'id'> & { link?: string } = {
     title,
     description,
     read: false,
     date: new Date().toISOString(),
-    link: link || undefined,
   };
+
+  if (link) {
+      newNotification.link = link;
+  }
 
   const updatePromises = targetDrivers.map(driver => {
     const driverRef = doc(db, 'drivers', driver.id);
